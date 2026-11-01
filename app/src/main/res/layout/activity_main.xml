@@ -4,10 +4,21 @@
     android:layout_height="match_parent"
     android:padding="16dp">
 
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/switch_strict_mode"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true"
+        android:text="Strict Mode "
+        android:textStyle="bold" />
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_view_tasks"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:layout_below="@id/switch_strict_mode"
+        android:layout_marginTop="16dp" />
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fab_add_task"

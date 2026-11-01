@@ -15,13 +15,20 @@ import java.util.List;
 public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder> {
     private List<Task> tasks = new ArrayList<>();
     private OnItemClickListener listener;
+    private int activeTaskId = -1;
 
     public interface OnItemClickListener {
         void onItemClick(Task task);
+        void onItemLongClick(Task task);
     }
 
     public void setOnItemClickListener(OnItemClickListener listener) {
         this.listener = listener;
+    }
+
+    public void setActiveTaskId(int id) {
+        this.activeTaskId = id;
+        notifyDataSetChanged();
     }
 
     @NonNull
@@ -35,16 +42,31 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
     @Override
     public void onBindViewHolder(@NonNull TaskViewHolder holder, int position) {
         Task currentTask = tasks.get(position);
-        holder.taskName.setText(currentTask.getName());
 
         String countText = currentTask.getCompletedPomodoros() + "/" + currentTask.getEstimatedPomodoros();
         holder.pomodoroCount.setText(countText);
         holder.checkBox.setChecked(currentTask.isCompleted());
 
+        if (currentTask.getId() == activeTaskId) {
+            holder.itemView.setBackgroundColor(android.graphics.Color.parseColor("#E0F7FA"));
+            holder.taskName.setTypeface(null, android.graphics.Typeface.BOLD);
+            holder.taskName.setText(currentTask.getName() + " (Active)");
+        } else {
+            holder.itemView.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+            holder.taskName.setTypeface(null, android.graphics.Typeface.NORMAL);
+            holder.taskName.setText(currentTask.getName());
+        }
+
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) {
                 listener.onItemClick(currentTask);
             }
+        });
+        holder.itemView.setOnLongClickListener(v -> {
+            if (listener != null) {
+                listener.onItemLongClick(currentTask);
+            }
+            return true;
         });
     }
 
