@@ -32,6 +32,7 @@ public class MainActivity extends AppCompatActivity {
         adapter.setOnItemClickListener(task -> {
             Intent intent = new Intent(MainActivity.this, TimerActivity.class);
             intent.putExtra("EXTRA_TASK_NAME", task.getName());
+            intent.putExtra("EXTRA_TASK_ID", task.getId());
             startActivity(intent);
         });
 

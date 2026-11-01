@@ -33,4 +33,8 @@ public class TaskViewModel extends AndroidViewModel {
     public void delete(Task task) {
         repository.delete(task);
     }
+
+    public void incrementPomodoroCount(int taskId) {
+        repository.incrementPomodoroCount(taskId);
+    }
 }

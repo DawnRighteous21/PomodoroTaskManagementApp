@@ -34,4 +34,8 @@ public class TaskRepository {
     public void delete(Task task) {
         executorService.execute(() -> taskDao.delete(task));
     }
+
+    public void incrementPomodoroCount(int taskId) {
+        executorService.execute(() -> taskDao.incrementPomodoroCount(taskId));
+    }
 }
