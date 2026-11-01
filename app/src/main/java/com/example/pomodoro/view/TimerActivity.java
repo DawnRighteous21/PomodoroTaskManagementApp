@@ -15,41 +15,37 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
-
 import com.example.pomodoro.R;
 import com.example.pomodoro.model.Quote;
 import com.example.pomodoro.network.QuoteApi;
 import com.example.pomodoro.network.RetrofitClient;
 import com.example.pomodoro.service.TimerService;
-
+import com.example.pomodoro.model.Task;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
 public class TimerActivity extends AppCompatActivity {
-    private static final long WORK_TIME_IN_MILLIS = 1500000;
-    private static final long BREAK_TIME_IN_MILLIS = 300000;
 
     private TextView textCountdown, textActiveTaskName, textQuote, textSessionCount;
     private ProgressBar progressTimer;
     private Button btnStartPause, btnSkip;
 
-    private String currentTaskName;
-    private int currentTaskId;
-    private int estimatedSessions;
+    private Task currentTask;
+    private int currentCompletedSessions;
     private boolean isStrictMode;
     private boolean currentlyOnBreak = false;
     private boolean isTimerRunning = false;
+    private long maxTimerValue = 1500000;
 
-    // Dialog state locks
     private boolean penaltyDialogShowing = false;
     private boolean callDialogShowing = false;
+    private boolean breakDialogShowing = false;
 
     private Handler quoteHandler = new Handler(Looper.getMainLooper());
     private int currentQuoteIndex = 0;
@@ -65,25 +61,30 @@ public class TimerActivity extends AppCompatActivity {
                     textQuote.animate().alpha(1f).setDuration(500);
                 });
             }
-            quoteHandler.postDelayed(this, 8000);
+            quoteHandler.postDelayed(this, 45000);
         }
     };
 
     private BroadcastReceiver timerReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            long timeLeft = intent.getLongExtra("TIME_LEFT", WORK_TIME_IN_MILLIS);
+            long timeLeft = intent.getLongExtra("TIME_LEFT", 0);
+            maxTimerValue = intent.getLongExtra("MAX_TIME", 1500000);
             boolean isWork = intent.getBooleanExtra("IS_WORK", true);
             isTimerRunning = intent.getBooleanExtra("IS_RUNNING", false);
-            int completed = intent.getIntExtra("COMPLETED_COUNT", 0);
+
+            currentCompletedSessions = intent.getIntExtra("COMPLETED_COUNT", currentCompletedSessions);
+
             boolean hasPenalty = intent.getBooleanExtra("STRICT_PENALTY_APPLIED", false);
             boolean pausedForCall = intent.getBooleanExtra("PAUSED_FOR_CALL", false);
 
             if (intent.getBooleanExtra("TASK_FINISHED", false)) {
+                updateUI(0, true, false, currentCompletedSessions);
                 showCongratsDialog();
                 return;
             }
-            if (intent.getBooleanExtra("BREAK_JUST_FINISHED", false)) {
+            if (intent.getBooleanExtra("BREAK_JUST_FINISHED", false) && !breakDialogShowing) {
+                breakDialogShowing = true;
                 showReadyToFocusDialog();
             }
 
@@ -92,7 +93,7 @@ public class TimerActivity extends AppCompatActivity {
                 sendCommandToService(TimerService.ACTION_CLEAR_PENALTY);
                 new androidx.appcompat.app.AlertDialog.Builder(TimerActivity.this)
                         .setTitle("Strict Mode Failed")
-                        .setMessage("You lost focus for too long! Your timer has been paused and reset to 25 minutes.")
+                        .setMessage("You lost focus for too long! Your timer has been paused and reset.")
                         .setCancelable(false)
                         .setPositiveButton("I Understand", (d, w) -> penaltyDialogShowing = false)
                         .show();
@@ -111,7 +112,7 @@ public class TimerActivity extends AppCompatActivity {
                         .show();
             }
 
-            updateUI(timeLeft, isWork, isTimerRunning, completed);
+            updateUI(timeLeft, isWork, isTimerRunning, currentCompletedSessions);
         }
     };
 
@@ -120,15 +121,15 @@ public class TimerActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_timer);
 
+        currentTask = (Task) getIntent().getSerializableExtra("EXTRA_TASK");
+        if (currentTask != null) {
+            currentCompletedSessions = currentTask.getCompletedPomodoros();
+        }
+        isStrictMode = getIntent().getBooleanExtra("EXTRA_STRICT_MODE", false);
+
         SharedPreferences quotePrefs = getSharedPreferences("quote_cache", MODE_PRIVATE);
         Set<String> savedQuotes = quotePrefs.getStringSet("saved_quotes", new HashSet<>());
         quoteList = new ArrayList<>(savedQuotes);
-
-        currentTaskId = getIntent().getIntExtra("EXTRA_TASK_ID", -1);
-        currentTaskName = getIntent().getStringExtra("EXTRA_TASK_NAME");
-        int startCompleted = getIntent().getIntExtra("EXTRA_TASK_COMPLETED", 0);
-        estimatedSessions = getIntent().getIntExtra("EXTRA_TASK_ESTIMATED", 1);
-        isStrictMode = getIntent().getBooleanExtra("EXTRA_STRICT_MODE", false);
 
         textActiveTaskName = findViewById(R.id.text_active_task_name);
         textCountdown = findViewById(R.id.text_countdown);
@@ -138,8 +139,17 @@ public class TimerActivity extends AppCompatActivity {
         btnStartPause = findViewById(R.id.btn_start_pause);
         btnSkip = findViewById(R.id.btn_skip);
 
-        textSessionCount.setText("Session: " + startCompleted + " / " + estimatedSessions);
-        if (currentTaskName != null) textActiveTaskName.setText(currentTaskName);
+        if (currentTask != null) {
+            textSessionCount.setText("Session: " + currentCompletedSessions + " / " + currentTask.getEstimatedPomodoros());
+            textActiveTaskName.setText(currentTask.getName());
+
+            long initialTime = currentTask.getWorkDuration() * (currentTask.isDevTask() ? 1000L : 60000L);
+            progressTimer.setMax((int) initialTime);
+            progressTimer.setProgress((int) initialTime);
+            int minutes = (int) (initialTime / 1000) / 60;
+            int seconds = (int) (initialTime / 1000) % 60;
+            textCountdown.setText(String.format(java.util.Locale.getDefault(), "%02d:%02d", minutes, seconds));
+        }
 
         btnStartPause.setOnClickListener(v -> {
             if (btnStartPause.getText().toString().equals("Pause")) {
@@ -184,8 +194,11 @@ public class TimerActivity extends AppCompatActivity {
     }
 
     private void updateUI(long timeLeft, boolean isWork, boolean isRunning, int completed) {
-        textSessionCount.setText("Session: " + completed + " / " + estimatedSessions);
-        progressTimer.setMax((int) (isWork ? WORK_TIME_IN_MILLIS : BREAK_TIME_IN_MILLIS));
+        if (currentTask != null) {
+            textSessionCount.setText("Session: " + completed + " / " + currentTask.getEstimatedPomodoros());
+        }
+
+        progressTimer.setMax((int) maxTimerValue);
         progressTimer.setProgress((int) timeLeft);
 
         int minutes = (int) (timeLeft / 1000) / 60;
@@ -198,13 +211,13 @@ public class TimerActivity extends AppCompatActivity {
             if (!quoteList.isEmpty()) {
                 textQuote.setText(quoteList.get(0));
             } else {
-                textQuote.setText(""); // Pure empty UI until API answers
+                textQuote.setText("");
             }
             fetchAPIQuote();
             startQuoteCycling();
         } else if (isWork && currentlyOnBreak) {
             currentlyOnBreak = false;
-            textActiveTaskName.setText(currentTaskName);
+            if (currentTask != null) textActiveTaskName.setText(currentTask.getName());
             stopQuoteCycling();
         }
 
@@ -223,7 +236,7 @@ public class TimerActivity extends AppCompatActivity {
 
     private void startQuoteCycling() {
         quoteHandler.removeCallbacks(quoteRunnable);
-        quoteHandler.postDelayed(quoteRunnable, 8000);
+        quoteHandler.postDelayed(quoteRunnable, 45000);
     }
 
     private void stopQuoteCycling() {
@@ -252,8 +265,7 @@ public class TimerActivity extends AppCompatActivity {
                 }
             }
             @Override
-            public void onFailure(Call<List<Quote>> call, Throwable t) {
-            }
+            public void onFailure(Call<List<Quote>> call, Throwable t) {}
         });
     }
 
@@ -262,8 +274,11 @@ public class TimerActivity extends AppCompatActivity {
                 .setTitle("Break is over")
                 .setMessage("Are you ready to start your next focus session?")
                 .setCancelable(false)
-                .setPositiveButton("Let's Go", (dialog, which) -> sendCommandToService(TimerService.ACTION_START))
-                .setNegativeButton("Wait", null)
+                .setPositiveButton("Let's Go", (dialog, which) -> {
+                    breakDialogShowing = false;
+                    sendCommandToService(TimerService.ACTION_START);
+                })
+                .setNegativeButton("Wait", (dialog, which) -> breakDialogShowing = false)
                 .show();
     }
 
@@ -279,13 +294,16 @@ public class TimerActivity extends AppCompatActivity {
     private void sendCommandToService(String action) {
         Intent intent = new Intent(this, TimerService.class);
         intent.setAction(action);
-        if (action.equals(TimerService.ACTION_START)) {
-            intent.putExtra("EXTRA_TASK_ID", currentTaskId);
-            intent.putExtra("EXTRA_TASK_NAME", currentTaskName);
-            intent.putExtra("EXTRA_COMPLETED", getIntent().getIntExtra("EXTRA_TASK_COMPLETED", 0));
-            intent.putExtra("EXTRA_ESTIMATED", estimatedSessions);
-            intent.putExtra("EXTRA_STRICT_MODE", isStrictMode);
+
+        if (currentTask != null) {
+            currentTask.setCompletedPomodoros(currentCompletedSessions);
+            intent.putExtra("EXTRA_TASK", currentTask);
+            intent.putExtra("EXTRA_TASK_ID", currentTask.getId());
+            intent.putExtra("EXTRA_IS_DEV_TASK", currentTask.isDevTask());
         }
+        intent.putExtra("EXTRA_COMPLETED", currentCompletedSessions);
+        intent.putExtra("EXTRA_STRICT_MODE", isStrictMode);
+
         startService(intent);
     }
 }

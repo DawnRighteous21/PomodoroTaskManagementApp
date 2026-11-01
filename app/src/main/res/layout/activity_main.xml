@@ -4,11 +4,25 @@
     android:layout_height="match_parent"
     android:padding="16dp">
 
+    <TextView
+        android:id="@+id/text_dev_indicator"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_marginBottom="8dp"
+        android:background="#FFCDD2"
+        android:padding="8dp"
+        android:text="DEV MODE ACTIVE"
+        android:textAlignment="center"
+        android:textColor="#B00020"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
     <androidx.appcompat.widget.SwitchCompat
         android:id="@+id/switch_strict_mode"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
+        android:layout_below="@id/text_dev_indicator"
         android:layout_alignParentEnd="true"
         android:text="Strict Mode "
         android:textStyle="bold" />
@@ -24,9 +38,9 @@
         android:id="@+id/fab_add_task"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
         android:layout_alignParentEnd="true"
+        android:layout_alignParentBottom="true"
         android:layout_margin="16dp"
-        android:src="@android:drawable/ic_input_add"
-        android:contentDescription="Add Task" />
+        android:contentDescription="Add Task"
+        android:src="@android:drawable/ic_input_add" />
 </RelativeLayout>

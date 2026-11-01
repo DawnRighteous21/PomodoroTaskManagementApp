@@ -9,7 +9,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.EditText;
-import android.widget.Toast;
+import android.widget.TextView;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SwitchCompat;
@@ -22,13 +22,15 @@ import com.example.pomodoro.model.Task;
 import com.example.pomodoro.view.TaskAdapter;
 import com.example.pomodoro.view.TimerActivity;
 import com.example.pomodoro.viewmodel.TaskViewModel;
-import com.example.pomodoro.service.TimerService; // Import required
+import com.example.pomodoro.service.TimerService;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
     private TaskViewModel taskViewModel;
     private SwitchCompat switchStrictMode;
     private RecyclerView recyclerView;
-    private static boolean isFreshLaunch = true;
+    private TextView textDevIndicator;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,6 +48,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
+        textDevIndicator = findViewById(R.id.text_dev_indicator);
         switchStrictMode = findViewById(R.id.switch_strict_mode);
         switchStrictMode.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (isChecked && buttonView.isPressed()) {
@@ -71,45 +74,63 @@ public class MainActivity extends AppCompatActivity {
             public void onItemClick(Task task) {
                 int runningId = getSharedPreferences("TimerPrefs", Context.MODE_PRIVATE).getInt("activeTaskId", -1);
                 if (runningId != -1 && runningId != task.getId()) {
-                    Toast.makeText(MainActivity.this, "Finish the current active task first!", Toast.LENGTH_SHORT).show();
+                    new AlertDialog.Builder(MainActivity.this)
+                            .setTitle("Chuyển công việc?")
+                            .setMessage("Một công việc khác đang chạy. Bạn có muốn dừng nó và chuyển sang công việc này không?")
+                            .setPositiveButton("Chuyển", (dialog, which) -> {
+                                Intent stopIntent = new Intent(MainActivity.this, TimerService.class);
+                                stopIntent.setAction(TimerService.ACTION_FORCE_STOP);
+                                startService(stopIntent);
+                                launchTimer(task);
+                            })
+                            .setNegativeButton("Hủy", null)
+                            .show();
                     return;
                 }
 
-                if (task.getCompletedPomodoros() >= task.getEstimatedPomodoros()) {
-                    Toast.makeText(MainActivity.this, "Task already completed!", Toast.LENGTH_SHORT).show();
+                if (task.isCompleted()) {
+                    new AlertDialog.Builder(MainActivity.this)
+                            .setTitle("Task Completed")
+                            .setMessage("Do you want to restart this task from session 0?")
+                            .setPositiveButton("Restart", (dialog, which) -> {
+                                task.setCompletedPomodoros(0);
+                                task.setCompleted(false);
+                                taskViewModel.update(task);
+                                launchTimer(task);
+                            })
+                            .setNegativeButton("Cancel", null)
+                            .show();
                     return;
                 }
 
-                Intent intent = new Intent(MainActivity.this, TimerActivity.class);
-                intent.putExtra("EXTRA_TASK_NAME", task.getName());
-                intent.putExtra("EXTRA_TASK_ID", task.getId());
-                intent.putExtra("EXTRA_TASK_COMPLETED", task.getCompletedPomodoros());
-                intent.putExtra("EXTRA_TASK_ESTIMATED", task.getEstimatedPomodoros());
-                intent.putExtra("EXTRA_STRICT_MODE", switchStrictMode.isChecked());
-                startActivity(intent);
+                launchTimer(task);
             }
 
             @Override
             public void onItemLongClick(Task task) {
                 new AlertDialog.Builder(MainActivity.this)
-                        .setTitle("Delete Task")
-                        .setMessage("Delete '" + task.getName() + "'?")
-                        .setPositiveButton("Delete", (dialog, which) -> {
-                            // DETECT IF DELETING ACTIVE TASK
-                            int runningId = getSharedPreferences("TimerPrefs", Context.MODE_PRIVATE).getInt("activeTaskId", -1);
-                            if (runningId == task.getId()) {
-                                Intent stopIntent = new Intent(MainActivity.this, TimerService.class);
-                                stopIntent.setAction(TimerService.ACTION_FORCE_STOP);
-                                startService(stopIntent);
-
-                                // Clear visual indicator instantly
-                                if (recyclerView.getAdapter() instanceof TaskAdapter) {
-                                    ((TaskAdapter) recyclerView.getAdapter()).setActiveTaskId(-1);
-                                }
-                            }
-                            taskViewModel.delete(task);
+                        .setTitle("Tùy chọn")
+                        .setPositiveButton("Sửa", (dialog, which) -> showTaskDialog(task))
+                        .setNegativeButton("Xóa", (dialog, which) -> {
+                            new AlertDialog.Builder(MainActivity.this)
+                                    .setTitle("Xác nhận")
+                                    .setMessage("Bạn có chắc chắn muốn xóa công việc này?")
+                                    .setPositiveButton("Xóa", (confirmDialog, confirmWhich) -> {
+                                        int runningId = getSharedPreferences("TimerPrefs", Context.MODE_PRIVATE).getInt("activeTaskId", -1);
+                                        if (runningId == task.getId()) {
+                                            Intent stopIntent = new Intent(MainActivity.this, TimerService.class);
+                                            stopIntent.setAction(TimerService.ACTION_FORCE_STOP);
+                                            startService(stopIntent);
+                                            if (recyclerView.getAdapter() instanceof TaskAdapter) {
+                                                ((TaskAdapter) recyclerView.getAdapter()).setActiveTaskId(-1);
+                                            }
+                                        }
+                                        taskViewModel.delete(task);
+                                    })
+                                    .setNegativeButton("Hủy", null)
+                                    .show();
                         })
-                        .setNegativeButton("Cancel", null)
+                        .setNeutralButton("Hủy", null)
                         .show();
             }
         });
@@ -117,55 +138,142 @@ public class MainActivity extends AppCompatActivity {
         taskViewModel = new ViewModelProvider(this).get(TaskViewModel.class);
         taskViewModel.getAllTasks().observe(this, adapter::setTasks);
 
-        findViewById(R.id.fab_add_task).setOnClickListener(v -> showAddTaskDialog());
+        FloatingActionButton fab = findViewById(R.id.fab_add_task);
+        fab.setOnClickListener(v -> showTaskDialog(null));
+
+        fab.setOnLongClickListener(v -> {
+            SharedPreferences prefs = getSharedPreferences("TimerPrefs", MODE_PRIVATE);
+            boolean isDev = prefs.getBoolean("dev_mode", false);
+            prefs.edit().putBoolean("dev_mode", !isDev).apply();
+            updateDevModeUI(!isDev);
+            return true;
+        });
+    }
+
+    private void updateDevModeUI(boolean isDev) {
+        textDevIndicator.setVisibility(isDev ? View.VISIBLE : View.GONE);
+    }
+
+    private void launchTimer(Task task) {
+        Intent intent = new Intent(MainActivity.this, TimerActivity.class);
+        intent.putExtra("EXTRA_TASK", task);
+        intent.putExtra("EXTRA_STRICT_MODE", switchStrictMode.isChecked());
+        startActivity(intent);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         SharedPreferences prefs = getSharedPreferences("TimerPrefs", Context.MODE_PRIVATE);
-        int activeTaskId = prefs.getInt("activeTaskId", -1);
 
-        if (isFreshLaunch && activeTaskId != -1) {
-            isFreshLaunch = false;
-            Intent intent = new Intent(this, TimerActivity.class);
-            intent.putExtra("EXTRA_TASK_ID", activeTaskId);
-            intent.putExtra("EXTRA_TASK_NAME", prefs.getString("activeTaskName", ""));
-            intent.putExtra("EXTRA_TASK_COMPLETED", prefs.getInt("activeTaskCompleted", 0));
-            intent.putExtra("EXTRA_TASK_ESTIMATED", prefs.getInt("activeTaskEstimated", 1));
-            intent.putExtra("EXTRA_STRICT_MODE", prefs.getBoolean("activeTaskStrict", false));
-            intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            startActivity(intent);
-            return;
+        updateDevModeUI(prefs.getBoolean("dev_mode", false));
+
+        if (!TimerService.isServiceRunning) {
+            prefs.edit().putInt("activeTaskId", -1).apply();
         }
-        isFreshLaunch = false;
+
+        int activeTaskId = prefs.getInt("activeTaskId", -1);
 
         if (recyclerView != null && recyclerView.getAdapter() instanceof TaskAdapter) {
             ((TaskAdapter) recyclerView.getAdapter()).setActiveTaskId(activeTaskId);
         }
     }
 
-    private void showAddTaskDialog() {
+    private void showTaskDialog(Task existingTask) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Thêm công việc mới");
+        builder.setTitle(existingTask == null ? "Thêm công việc mới" : "Sửa công việc");
 
         View view = getLayoutInflater().inflate(R.layout.dialog_add_task, null);
         EditText editTaskName = view.findViewById(R.id.edit_task_name);
         EditText editPomodoros = view.findViewById(R.id.edit_estimated_pomodoros);
+        EditText editWorkTime = view.findViewById(R.id.edit_work_time);
+        EditText editBreakTime = view.findViewById(R.id.edit_break_time);
+        TextView textWorkLabel = view.findViewById(R.id.text_work_label);
+        TextView textBreakLabel = view.findViewById(R.id.text_break_label);
+
+        boolean isDevTaskMode;
+        if (existingTask != null) {
+            isDevTaskMode = existingTask.isDevTask();
+        } else {
+            isDevTaskMode = getSharedPreferences("TimerPrefs", MODE_PRIVATE).getBoolean("dev_mode", false);
+        }
+
+        if (isDevTaskMode) {
+            textWorkLabel.setText("Làm việc (giây)");
+            textBreakLabel.setText("Nghỉ ngơi (giây)");
+        }
+
+        if (existingTask != null) {
+            editTaskName.setText(existingTask.getName());
+            editPomodoros.setText(String.valueOf(existingTask.getEstimatedPomodoros()));
+            editWorkTime.setText(String.valueOf(existingTask.getWorkDuration()));
+            editBreakTime.setText(String.valueOf(existingTask.getBreakDuration()));
+        }
 
         builder.setView(view);
-        builder.setPositiveButton("Lưu", (dialog, which) -> {
+        builder.setPositiveButton("Lưu", null);
+        builder.setNegativeButton("Hủy", (dialog, which) -> dialog.dismiss());
+
+        AlertDialog dialog = builder.create();
+        dialog.show();
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             String name = editTaskName.getText().toString().trim();
             String pomodoroStr = editPomodoros.getText().toString().trim();
+            String workStr = editWorkTime.getText().toString().trim();
+            String breakStr = editBreakTime.getText().toString().trim();
 
-            if (!name.isEmpty() && !pomodoroStr.isEmpty()) {
-                int pomodoros = Integer.parseInt(pomodoroStr);
-                taskViewModel.insert(new Task(name, pomodoros));
-            } else {
-                Toast.makeText(this, "Vui lòng nhập đầy đủ thông tin", Toast.LENGTH_SHORT).show();
+            if (name.isEmpty() || pomodoroStr.isEmpty() || workStr.isEmpty() || breakStr.isEmpty()) {
+                new AlertDialog.Builder(MainActivity.this).setTitle("Lỗi").setMessage("Vui lòng nhập đầy đủ thông tin").setPositiveButton("OK", null).show();
+                return;
             }
+
+            List<Task> currentTasks = ((TaskAdapter) recyclerView.getAdapter()).getTasks();
+            for (Task t : currentTasks) {
+                if (t.getName().equalsIgnoreCase(name) && (existingTask == null || existingTask.getId() != t.getId())) {
+                    new AlertDialog.Builder(MainActivity.this).setTitle("Lỗi").setMessage("Tên công việc này đã tồn tại!").setPositiveButton("OK", null).show();
+                    return;
+                }
+            }
+
+            int pomodoros = Integer.parseInt(pomodoroStr);
+            int workMins = Integer.parseInt(workStr);
+            int breakMins = Integer.parseInt(breakStr);
+
+            if (workMins < 1 || breakMins < 1 || pomodoros < 1) {
+                new AlertDialog.Builder(MainActivity.this).setTitle("Lỗi").setMessage("Giá trị phải lớn hơn 0").setPositiveButton("OK", null).show();
+                return;
+            }
+
+            if (!isDevTaskMode) {
+                if (workMins < 10 || workMins > 90) {
+                    new AlertDialog.Builder(MainActivity.this).setTitle("Lỗi").setMessage("Thời gian làm việc phải từ 10 - 90 phút").setPositiveButton("OK", null).show();
+                    return;
+                }
+                if (breakMins < 1 || breakMins > 30) {
+                    new AlertDialog.Builder(MainActivity.this).setTitle("Lỗi").setMessage("Thời gian nghỉ phải từ 1 - 30 phút").setPositiveButton("OK", null).show();
+                    return;
+                }
+            }
+
+            if (existingTask == null) {
+                taskViewModel.insert(new Task(name, pomodoros, workMins, breakMins, isDevTaskMode));
+            } else {
+                existingTask.setName(name);
+                existingTask.setEstimatedPomodoros(pomodoros);
+                existingTask.setWorkDuration(workMins);
+                existingTask.setBreakDuration(breakMins);
+                taskViewModel.update(existingTask);
+
+                int runningId = getSharedPreferences("TimerPrefs", Context.MODE_PRIVATE).getInt("activeTaskId", -1);
+                if (runningId == existingTask.getId()) {
+                    Intent stopIntent = new Intent(MainActivity.this, TimerService.class);
+                    stopIntent.setAction(TimerService.ACTION_FORCE_STOP);
+                    startService(stopIntent);
+                    new AlertDialog.Builder(MainActivity.this).setTitle("Thông báo").setMessage("Công việc đang chạy đã được cập nhật và dừng lại.").setPositiveButton("OK", null).show();
+                }
+            }
+            dialog.dismiss();
         });
-        builder.setNegativeButton("Hủy", (dialog, which) -> dialog.dismiss());
-        builder.create().show();
     }
 }

@@ -1,5 +1,7 @@
 package com.example.pomodoro.view;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -31,6 +33,10 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
         notifyDataSetChanged();
     }
 
+    public List<Task> getTasks() {
+        return tasks;
+    }
+
     @NonNull
     @Override
     public TaskViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -47,14 +53,19 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
         holder.pomodoroCount.setText(countText);
         holder.checkBox.setChecked(currentTask.isCompleted());
 
+        String displayName = currentTask.getName();
+        if (currentTask.isDevTask()) {
+            displayName = "[DEV] " + displayName;
+        }
+
         if (currentTask.getId() == activeTaskId) {
             holder.itemView.setBackgroundColor(android.graphics.Color.parseColor("#E0F7FA"));
             holder.taskName.setTypeface(null, android.graphics.Typeface.BOLD);
-            holder.taskName.setText(currentTask.getName() + " (Active)");
+            holder.taskName.setText(displayName + " (Active)");
         } else {
             holder.itemView.setBackgroundColor(android.graphics.Color.TRANSPARENT);
             holder.taskName.setTypeface(null, android.graphics.Typeface.NORMAL);
-            holder.taskName.setText(currentTask.getName());
+            holder.taskName.setText(displayName);
         }
 
         holder.itemView.setOnClickListener(v -> {

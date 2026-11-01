@@ -36,6 +36,17 @@ public class TaskRepository {
     }
 
     public void incrementPomodoroCount(int taskId) {
-        executorService.execute(() -> taskDao.incrementPomodoroCount(taskId));
+        executorService.execute(() -> {
+            Task task = taskDao.getTaskById(taskId);
+            if (task != null && !task.isCompleted()) {
+                int newCount = task.getCompletedPomodoros() + 1;
+                task.setCompletedPomodoros(newCount);
+
+                if (newCount >= task.getEstimatedPomodoros()) {
+                    task.setCompleted(true);
+                }
+                taskDao.update(task);
+            }
+        });
     }
 }

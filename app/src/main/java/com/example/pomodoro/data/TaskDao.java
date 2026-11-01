@@ -23,6 +23,6 @@ public interface TaskDao {
     @Query("SELECT * FROM tasks ORDER BY id DESC")
     LiveData<List<Task>> getAllTasks();
 
-    @Query("UPDATE tasks SET completedPomodoros = completedPomodoros + 1 WHERE id = :taskId")
-    void incrementPomodoroCount(int taskId);
+    @Query("SELECT * FROM tasks WHERE id = :taskId")
+    Task getTaskById(int taskId);
 }

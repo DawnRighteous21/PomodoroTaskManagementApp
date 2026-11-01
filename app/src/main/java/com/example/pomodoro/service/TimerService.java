@@ -22,9 +22,12 @@ import com.example.pomodoro.MainActivity;
 import com.example.pomodoro.R;
 import com.example.pomodoro.data.TaskRepository;
 import com.example.pomodoro.view.TimerActivity;
+import com.example.pomodoro.model.Task;
 import java.util.Locale;
 
 public class TimerService extends Service {
+    public static boolean isServiceRunning = false;
+
     public static final String ACTION_START = "START";
     public static final String ACTION_PAUSE = "PAUSE";
     public static final String ACTION_SKIP = "SKIP";
@@ -38,22 +41,24 @@ public class TimerService extends Service {
     private static final String CHANNEL_ID = "TimerChannel";
     private static final String ALERT_CHANNEL_ID = "AlertChannel";
 
-    private static final long WORK_TIME_IN_MILLIS = 1500000;
-    private static final long BREAK_TIME_IN_MILLIS = 300000;
-
     private CountDownTimer timer;
     private TaskRepository repository;
     private NotificationManager notificationManager;
 
     private boolean isWorkSession = true;
     private boolean isRunning = false;
-    private long timeLeftInMillis = WORK_TIME_IN_MILLIS;
+    private long timeLeftInMillis = 0;
+    private long workTimeInMillis = 0;
+    private long breakTimeInMillis = 0;
 
     private int taskId = -1;
     private String taskName = "";
     private int completedSessions = 0;
     private int estimatedSessions = 1;
     private boolean isStrictMode = false;
+    private int storedWorkMins = 25;
+    private int storedBreakMins = 5;
+    private boolean isDevTask = false;
 
     private boolean penaltyApplied = false;
     private boolean wasPausedForCall = false;
@@ -62,9 +67,10 @@ public class TimerService extends Service {
         if (isWorkSession && isRunning) {
             if (timer != null) timer.cancel();
             isRunning = false;
-            timeLeftInMillis = WORK_TIME_IN_MILLIS;
+            timeLeftInMillis = workTimeInMillis;
             penaltyApplied = true;
             updateForegroundNotification();
+            sendHighPriorityAlert("Strict Mode Failed", "Focus lost! Timer reset.");
             broadcastUpdate(false, false);
         }
     };
@@ -89,6 +95,7 @@ public class TimerService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        isServiceRunning = true;
         repository = new TaskRepository(getApplication());
         notificationManager = getSystemService(NotificationManager.class);
         createNotificationChannels();
@@ -104,17 +111,40 @@ public class TimerService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && intent.getAction() != null) {
+
+            Task task = (Task) intent.getSerializableExtra("EXTRA_TASK");
+            if (task != null) {
+                boolean isTaskChanging = (taskId != -1 && taskId != task.getId());
+
+                taskId = task.getId();
+                taskName = task.getName();
+                estimatedSessions = task.getEstimatedPomodoros();
+                storedWorkMins = task.getWorkDuration();
+                storedBreakMins = task.getBreakDuration();
+                isDevTask = task.isDevTask();
+
+                completedSessions = intent.getIntExtra("EXTRA_COMPLETED", completedSessions);
+                isStrictMode = intent.getBooleanExtra("EXTRA_STRICT_MODE", isStrictMode);
+
+                long newWorkTime = isDevTask ? storedWorkMins * 1000L : storedWorkMins * 60000L;
+                long newBreakTime = isDevTask ? storedBreakMins * 1000L : storedBreakMins * 60000L;
+
+                if (isTaskChanging || timeLeftInMillis == 0 || workTimeInMillis != newWorkTime || breakTimeInMillis != newBreakTime) {
+                    if (timer != null) timer.cancel();
+                    isRunning = false;
+                    isWorkSession = true;
+                    timeLeftInMillis = newWorkTime;
+                }
+
+                workTimeInMillis = newWorkTime;
+                breakTimeInMillis = newBreakTime;
+            }
+
             switch (intent.getAction()) {
                 case ACTION_START:
                     wasPausedForCall = false;
                     penaltyApplied = false;
                     if (!isRunning) {
-                        taskId = intent.getIntExtra("EXTRA_TASK_ID", taskId);
-                        taskName = intent.getStringExtra("EXTRA_TASK_NAME");
-                        completedSessions = intent.getIntExtra("EXTRA_COMPLETED", completedSessions);
-                        estimatedSessions = intent.getIntExtra("EXTRA_ESTIMATED", estimatedSessions);
-                        isStrictMode = intent.getBooleanExtra("EXTRA_STRICT_MODE", isStrictMode);
-
                         saveActiveTaskState();
                         startForegroundNotification();
                         startTimer();
@@ -125,7 +155,20 @@ public class TimerService extends Service {
                     break;
                 case ACTION_SKIP:
                     if (timer != null) timer.cancel();
-                    handleSessionEnd();
+                    isRunning = false;
+
+                    if (isWorkSession) {
+                        isWorkSession = false;
+                        timeLeftInMillis = breakTimeInMillis;
+                        saveActiveTaskState();
+                        startForegroundNotification();
+                        startTimer();
+                    } else {
+                        isWorkSession = true;
+                        timeLeftInMillis = workTimeInMillis;
+                        broadcastUpdate(false, true);
+                        stopForeground(true);
+                    }
                     break;
                 case ACTION_REQUEST_STATE:
                     broadcastUpdate(false, false);
@@ -144,6 +187,10 @@ public class TimerService extends Service {
                 case ACTION_FORCE_STOP:
                     if (timer != null) timer.cancel();
                     isRunning = false;
+                    timeLeftInMillis = 0;
+                    workTimeInMillis = 0;
+                    breakTimeInMillis = 0;
+                    taskId = -1;
                     clearActiveTaskState();
                     stopForeground(true);
                     stopSelf();
@@ -161,6 +208,9 @@ public class TimerService extends Service {
                 .putInt("activeTaskCompleted", completedSessions)
                 .putInt("activeTaskEstimated", estimatedSessions)
                 .putBoolean("activeTaskStrict", isStrictMode)
+                .putInt("activeTaskWorkDur", storedWorkMins)
+                .putInt("activeTaskBreakDur", storedBreakMins)
+                .putBoolean("activeTaskIsDev", isDevTask)
                 .apply();
     }
 
@@ -211,14 +261,14 @@ public class TimerService extends Service {
                 return;
             }
 
-            sendHighPriorityAlert("Work Complete!", "Time for a 5-minute break.");
+            sendHighPriorityAlert("Work Complete!", "Time for your break.");
             isWorkSession = false;
-            timeLeftInMillis = BREAK_TIME_IN_MILLIS;
+            timeLeftInMillis = breakTimeInMillis;
             startTimer();
         } else {
             sendHighPriorityAlert("Break Over!", "Ready to focus again?");
             isWorkSession = true;
-            timeLeftInMillis = WORK_TIME_IN_MILLIS;
+            timeLeftInMillis = workTimeInMillis;
             broadcastUpdate(false, true);
             stopForeground(true);
         }
@@ -228,12 +278,12 @@ public class TimerService extends Service {
         Intent intent = new Intent(UPDATE_BROADCAST);
         intent.setPackage(getPackageName());
         intent.putExtra("TIME_LEFT", timeLeftInMillis);
+        intent.putExtra("MAX_TIME", isWorkSession ? workTimeInMillis : breakTimeInMillis);
         intent.putExtra("IS_WORK", isWorkSession);
         intent.putExtra("IS_RUNNING", isRunning);
         intent.putExtra("COMPLETED_COUNT", completedSessions);
         intent.putExtra("TASK_FINISHED", taskFinished);
         intent.putExtra("BREAK_JUST_FINISHED", breakJustFinished);
-
         intent.putExtra("STRICT_PENALTY_APPLIED", penaltyApplied);
         intent.putExtra("PAUSED_FOR_CALL", wasPausedForCall);
         sendBroadcast(intent);
@@ -258,12 +308,7 @@ public class TimerService extends Service {
         String timeStr = String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds);
         String state = isWorkSession ? "Working on: " : "Break from: ";
 
-        Intent clickIntent = new Intent(this, TimerActivity.class);
-        clickIntent.putExtra("EXTRA_TASK_ID", taskId);
-        clickIntent.putExtra("EXTRA_TASK_NAME", taskName);
-        clickIntent.putExtra("EXTRA_TASK_COMPLETED", completedSessions);
-        clickIntent.putExtra("EXTRA_TASK_ESTIMATED", estimatedSessions);
-        clickIntent.putExtra("EXTRA_STRICT_MODE", isStrictMode);
+        Intent clickIntent = new Intent(this, MainActivity.class);
         clickIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, clickIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
@@ -315,6 +360,7 @@ public class TimerService extends Service {
 
     @Override
     public void onDestroy() {
+        isServiceRunning = false;
         if (timer != null) timer.cancel();
         unregisterReceiver(phoneStateReceiver);
         super.onDestroy();
