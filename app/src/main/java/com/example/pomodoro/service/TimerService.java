@@ -252,6 +252,9 @@ public class TimerService extends Service {
             saveActiveTaskState();
             if (taskId != -1) repository.incrementPomodoroCount(taskId);
 
+            String today = new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new java.util.Date());
+            repository.logSession(today, taskName, storedWorkMins);
+
             if (completedSessions >= estimatedSessions) {
                 clearActiveTaskState();
                 sendHighPriorityAlert("Task Complete!", "You have finished all Pomodoros for this task.");

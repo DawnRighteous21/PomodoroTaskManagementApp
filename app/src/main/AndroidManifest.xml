@@ -26,6 +26,7 @@
         </activity>
 
         <activity android:name=".view.TimerActivity" />
+        <activity android:name=".view.StatisticsActivity" />
         <service android:name=".service.TimerService" android:foregroundServiceType="specialUse" android:exported="false" />
     </application>
 

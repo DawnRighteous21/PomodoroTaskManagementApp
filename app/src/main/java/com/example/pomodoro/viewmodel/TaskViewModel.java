@@ -6,6 +6,8 @@ import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import com.example.pomodoro.data.TaskRepository;
 import com.example.pomodoro.model.Task;
+import com.example.pomodoro.model.DailyStat;
+import com.example.pomodoro.model.TaskStatDTO;
 import java.util.List;
 
 public class TaskViewModel extends AndroidViewModel {
@@ -36,5 +38,11 @@ public class TaskViewModel extends AndroidViewModel {
 
     public void incrementPomodoroCount(int taskId) {
         repository.incrementPomodoroCount(taskId);
+    }
+    public LiveData<List<DailyStat>> getLast30DaysStats() {
+        return repository.getLast30DaysStats();
+    }
+    public LiveData<List<TaskStatDTO>> getTasksForDate(String date) {
+        return repository.getTasksForDate(date);
     }
 }

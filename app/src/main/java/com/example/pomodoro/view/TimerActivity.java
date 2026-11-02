@@ -15,6 +15,7 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.appcompat.widget.Toolbar;
 import com.example.pomodoro.R;
 import com.example.pomodoro.model.Quote;
 import com.example.pomodoro.network.QuoteApi;
@@ -120,6 +121,13 @@ public class TimerActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_timer);
+
+        Toolbar toolbar = findViewById(R.id.toolbar_timer);
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle("");
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
 
         currentTask = (Task) getIntent().getSerializableExtra("EXTRA_TASK");
         if (currentTask != null) {
@@ -305,5 +313,9 @@ public class TimerActivity extends AppCompatActivity {
         intent.putExtra("EXTRA_STRICT_MODE", isStrictMode);
 
         startService(intent);
+    }
+    public boolean onSupportNavigateUp() {
+        finish();
+        return true;
     }
 }

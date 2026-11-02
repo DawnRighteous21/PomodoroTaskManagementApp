@@ -2,54 +2,68 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="24dp">
+    >
 
-    <TextView
-        android:id="@+id/text_active_task_name"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_centerHorizontal="true"
-        android:layout_marginTop="32dp"
-        android:text="Task Name"
-        android:textSize="24sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:id="@+id/text_session_count"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_above="@id/layout_timer_circle"
-        android:layout_centerHorizontal="true"
-        android:layout_marginBottom="16dp"
-        android:text="Session: 0 / 0"
-        android:textSize="18sp"
-        android:textColor="#666666" />
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar_timer"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorPrimary"
+        android:theme="@style/ThemeOverlay.Material3.Dark.ActionBar" />
 
     <RelativeLayout
-        android:id="@+id/layout_timer_circle"
-        android:layout_width="300dp"
-        android:layout_height="300dp"
-        android:layout_centerInParent="true">
-
-        <ProgressBar
-            android:id="@+id/progress_timer"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:indeterminate="false"
-            android:max="100"
-            android:progress="100"
-            android:progressDrawable="@drawable/circular_progress" />
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/toolbar_timer"
+        android:padding="24dp">
 
         <TextView
-            android:id="@+id/text_countdown"
+            android:id="@+id/text_active_task_name"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_centerInParent="true"
-            android:text="25:00"
-            android:textSize="56sp"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="32dp"
+            android:text="Task Name"
+            android:textSize="24sp"
             android:textStyle="bold" />
-    </RelativeLayout>
+
+        <TextView
+            android:id="@+id/text_session_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_above="@id/layout_timer_circle"
+            android:layout_centerHorizontal="true"
+            android:layout_marginBottom="16dp"
+            android:text="Session: 0 / 0"
+            android:textSize="18sp"
+            android:textColor="#666666" />
+
+        <RelativeLayout
+            android:id="@+id/layout_timer_circle"
+            android:layout_width="300dp"
+            android:layout_height="300dp"
+            android:layout_centerInParent="true">
+
+            <ProgressBar
+                android:id="@+id/progress_timer"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:indeterminate="false"
+                android:max="100"
+                android:progress="100"
+                android:progressDrawable="@drawable/circular_progress" />
+
+            <TextView
+                android:id="@+id/text_countdown"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:text="25:00"
+                android:textSize="56sp"
+                android:textStyle="bold" />
+        </RelativeLayout>
+
 
     <TextView
         android:id="@+id/text_quote"
@@ -81,5 +95,6 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Skip" />
-    </LinearLayout>
+        </LinearLayout>
+    </RelativeLayout>
 </RelativeLayout>

@@ -7,23 +7,30 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.TextView;
+import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SwitchCompat;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.GravityCompat;
+import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.appcompat.widget.Toolbar;
 import com.example.pomodoro.model.Task;
+import com.example.pomodoro.view.StatisticsActivity;
 import com.example.pomodoro.view.TaskAdapter;
 import com.example.pomodoro.view.TimerActivity;
 import com.example.pomodoro.viewmodel.TaskViewModel;
 import com.example.pomodoro.service.TimerService;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.navigation.NavigationView;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
@@ -31,6 +38,8 @@ public class MainActivity extends AppCompatActivity {
     private SwitchCompat switchStrictMode;
     private RecyclerView recyclerView;
     private TextView textDevIndicator;
+    private DrawerLayout drawerLayout;
+    private ActionBarDrawerToggle drawerToggle;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,6 +56,26 @@ public class MainActivity extends AppCompatActivity {
                 ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_PHONE_STATE}, 101);
             }
         }
+
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+
+        drawerLayout = findViewById(R.id.drawer_layout);
+        drawerToggle = new ActionBarDrawerToggle(this, drawerLayout, toolbar, 0, 0);
+        drawerLayout.addDrawerListener(drawerToggle);
+        drawerToggle.syncState();
+
+        NavigationView navigationView = findViewById(R.id.nav_view);
+        navigationView.setNavigationItemSelectedListener(item -> {
+            int id = item.getItemId();
+            if (id == R.id.nav_home) {
+                drawerLayout.closeDrawer(GravityCompat.START);
+            } else if (id == R.id.nav_statistics) {
+                startActivity(new Intent(MainActivity.this, StatisticsActivity.class));
+                drawerLayout.closeDrawer(GravityCompat.START);
+            }
+            return true;
+        });
 
         textDevIndicator = findViewById(R.id.text_dev_indicator);
         switchStrictMode = findViewById(R.id.switch_strict_mode);
@@ -148,6 +177,14 @@ public class MainActivity extends AppCompatActivity {
             updateDevModeUI(!isDev);
             return true;
         });
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (drawerToggle.onOptionsItemSelected(item)) {
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     private void updateDevModeUI(boolean isDev) {
