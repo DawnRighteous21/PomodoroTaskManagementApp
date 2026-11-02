@@ -306,13 +306,21 @@ public class TimerService extends Service {
     }
 
     private Notification buildNotification() {
-        int minutes = (int) (timeLeftInMillis / 1000) / 60;
-        int seconds = (int) (timeLeftInMillis / 1000) % 60;
+        long timeInSeconds = (long) Math.ceil(timeLeftInMillis / 1000.0);
+        int minutes = (int) (timeInSeconds / 60);
+        int seconds = (int) (timeInSeconds % 60);
         String timeStr = String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds);
         String state = isWorkSession ? "Working on: " : "Break from: ";
 
-        Intent clickIntent = new Intent(this, MainActivity.class);
+        Intent clickIntent = new Intent(this, TimerActivity.class);
         clickIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        
+        Task currentTask = new Task(taskName, estimatedSessions, storedWorkMins, storedBreakMins, isDevTask);
+        currentTask.setId(taskId);
+        currentTask.setCompletedPomodoros(completedSessions);
+        
+        clickIntent.putExtra("EXTRA_TASK", currentTask);
+        clickIntent.putExtra("EXTRA_STRICT_MODE", isStrictMode);
 
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, clickIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
@@ -327,8 +335,15 @@ public class TimerService extends Service {
     }
 
     private void sendHighPriorityAlert(String title, String message) {
-        Intent clickIntent = new Intent(this, MainActivity.class);
+        Intent clickIntent = new Intent(this, TimerActivity.class);
         clickIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        
+        Task currentTask = new Task(taskName, estimatedSessions, storedWorkMins, storedBreakMins, isDevTask);
+        currentTask.setId(taskId);
+        currentTask.setCompletedPomodoros(completedSessions);
+        
+        clickIntent.putExtra("EXTRA_TASK", currentTask);
+        clickIntent.putExtra("EXTRA_STRICT_MODE", isStrictMode);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 1, clickIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         NotificationCompat.Builder alert = new NotificationCompat.Builder(this, ALERT_CHANNEL_ID)

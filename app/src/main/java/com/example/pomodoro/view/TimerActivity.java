@@ -11,6 +11,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
 import android.widget.Button;
+import android.animation.ObjectAnimator;
+import android.view.animation.LinearInterpolator;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
@@ -35,6 +37,7 @@ public class TimerActivity extends AppCompatActivity {
 
     private TextView textCountdown, textActiveTaskName, textQuote, textSessionCount;
     private ProgressBar progressTimer;
+    private ObjectAnimator progressAnimator;
     private Button btnStartPause, btnSkip;
 
     private Task currentTask;
@@ -154,8 +157,9 @@ public class TimerActivity extends AppCompatActivity {
             long initialTime = currentTask.getWorkDuration() * (currentTask.isDevTask() ? 1000L : 60000L);
             progressTimer.setMax((int) initialTime);
             progressTimer.setProgress((int) initialTime);
-            int minutes = (int) (initialTime / 1000) / 60;
-            int seconds = (int) (initialTime / 1000) % 60;
+            long timeInSeconds = (long) Math.ceil(initialTime / 1000.0);
+            int minutes = (int) (timeInSeconds / 60);
+            int seconds = (int) (timeInSeconds % 60);
             textCountdown.setText(String.format(java.util.Locale.getDefault(), "%02d:%02d", minutes, seconds));
         }
 
@@ -199,6 +203,9 @@ public class TimerActivity extends AppCompatActivity {
         super.onStop();
         unregisterReceiver(timerReceiver);
         stopQuoteCycling();
+        if (progressAnimator != null) {
+            progressAnimator.cancel();
+        }
     }
 
     private void updateUI(long timeLeft, boolean isWork, boolean isRunning, int completed) {
@@ -207,10 +214,29 @@ public class TimerActivity extends AppCompatActivity {
         }
 
         progressTimer.setMax((int) maxTimerValue);
-        progressTimer.setProgress((int) timeLeft);
+        
+        if (isRunning) {
+            if (progressAnimator != null && progressAnimator.isRunning()) {
+                progressAnimator.cancel();
+            }
+            long targetProgress = Math.max(0, timeLeft - 1000);
+            if (Math.abs(progressTimer.getProgress() - timeLeft) > 2000) {
+                progressTimer.setProgress((int) timeLeft);
+            }
+            progressAnimator = ObjectAnimator.ofInt(progressTimer, "progress", progressTimer.getProgress(), (int) targetProgress);
+            progressAnimator.setDuration(1000);
+            progressAnimator.setInterpolator(new LinearInterpolator());
+            progressAnimator.start();
+        } else {
+            if (progressAnimator != null) {
+                progressAnimator.cancel();
+            }
+            progressTimer.setProgress((int) timeLeft);
+        }
 
-        int minutes = (int) (timeLeft / 1000) / 60;
-        int seconds = (int) (timeLeft / 1000) % 60;
+        long timeInSeconds = (long) Math.ceil(timeLeft / 1000.0);
+        int minutes = (int) (timeInSeconds / 60);
+        int seconds = (int) (timeInSeconds % 60);
         textCountdown.setText(String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds));
 
         if (!isWork && !currentlyOnBreak) {

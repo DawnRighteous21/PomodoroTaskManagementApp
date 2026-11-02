@@ -20,7 +20,7 @@
         android:layout_marginBottom="16dp"
         android:text="Chi tiết ngày"
         android:textColor="#333333"
-        android:textSize="20sp"
+        android:textSize="26sp"
         android:textStyle="bold" />
 
     <ScrollView

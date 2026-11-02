@@ -3,7 +3,40 @@
     <style name="Base.Theme.Pomodoro" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Customize your light theme here. -->
         <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <item name="alertDialogTheme">@style/CustomAlertDialogTheme</item>
+        <item name="materialButtonStyle">@style/CustomButtonStyle</item>
     </style>
 
     <style name="Theme.Pomodoro" parent="Base.Theme.Pomodoro" />
+
+    <style name="CustomAlertDialogTheme" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="materialAlertDialogTitleTextStyle">@style/CustomAlertDialogTitleStyle</item>
+        <item name="materialAlertDialogBodyTextStyle">@style/CustomAlertDialogBodyStyle</item>
+        <item name="buttonBarButtonStyle">@style/CustomAlertButtonStyle</item>
+    </style>
+
+    <style name="CustomAlertDialogTitleStyle" parent="MaterialAlertDialog.Material3.Title.Text">
+        <item name="android:textSize">24sp</item>
+    </style>
+
+    <style name="CustomAlertDialogBodyStyle" parent="MaterialAlertDialog.Material3.Body.Text">
+        <item name="android:textSize">19sp</item>
+    </style>
+
+    <style name="CustomAlertButtonStyle" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <style name="CustomButtonStyle" parent="Widget.Material3.Button">
+        <item name="android:textSize">16sp</item>
+        <item name="android:minHeight">55dp</item>
+        <item name="android:paddingTop">12dp</item>
+        <item name="android:paddingBottom">12dp</item>
+        <item name="android:paddingStart">30dp</item>
+        <item name="android:paddingEnd">30dp</item>
+    </style>
+
+    <style name="CustomDrawerTextAppearance" parent="TextAppearance.Material3.BodyLarge">
+        <item name="android:textSize">20sp</item>
+    </style>
 </resources>

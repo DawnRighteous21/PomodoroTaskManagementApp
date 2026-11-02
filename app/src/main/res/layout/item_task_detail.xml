@@ -23,7 +23,7 @@
             android:layout_marginBottom="8dp"
             android:text="Task Name"
             android:textColor="#212121"
-            android:textSize="16sp"
+            android:textSize="21sp"
             android:textStyle="bold" />
 
         <LinearLayout

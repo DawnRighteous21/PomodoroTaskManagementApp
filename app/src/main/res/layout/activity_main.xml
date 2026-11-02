@@ -25,6 +25,7 @@
             android:background="#FFCDD2"
             android:padding="8dp"
             android:text="DEV MODE ACTIVE"
+            android:textSize="20sp"
             android:textAlignment="center"
             android:textColor="#B00020"
             android:textStyle="bold"
@@ -36,6 +37,7 @@
             android:layout_height="wrap_content"
             android:layout_below="@id/text_dev_indicator"
             android:layout_alignParentEnd="true"
+            android:textSize="20sp"
             android:text="Strict Mode "
             android:textStyle="bold" />
 
@@ -62,6 +64,7 @@
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:layout_gravity="start"
+        app:itemTextAppearance="@style/CustomDrawerTextAppearance"
         app:menu="@menu/drawer_menu" />
 
 </androidx.drawerlayout.widget.DrawerLayout>
