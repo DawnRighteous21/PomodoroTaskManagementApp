@@ -277,8 +277,18 @@ public class MainActivity extends AppCompatActivity {
             int workMins = Integer.parseInt(workStr);
             int breakMins = Integer.parseInt(breakStr);
 
-            if (workMins < 1 || breakMins < 1 || pomodoros < 1) {
-                new AlertDialog.Builder(MainActivity.this).setTitle("Lỗi").setMessage("Giá trị phải lớn hơn 0").setPositiveButton("OK", null).show();
+            if (pomodoros < 1) {
+                new AlertDialog.Builder(MainActivity.this).setTitle("Lỗi").setMessage("Số phiên dự kiến phải lớn hơn 0").setPositiveButton("OK", null).show();
+                return;
+            }
+
+            if (workMins < 1) {
+                new AlertDialog.Builder(MainActivity.this).setTitle("Lỗi").setMessage("Thời gian làm việc phải lớn hơn 0").setPositiveButton("OK", null).show();
+                return;
+            }
+
+            if (breakMins < 1) {
+                new AlertDialog.Builder(MainActivity.this).setTitle("Lỗi").setMessage("Thời gian nghỉ phải lớn hơn 0").setPositiveButton("OK", null).show();
                 return;
             }
 

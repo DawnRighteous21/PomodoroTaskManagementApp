@@ -35,7 +35,7 @@ import retrofit2.Response;
 
 public class TimerActivity extends AppCompatActivity {
 
-    private TextView textCountdown, textActiveTaskName, textQuote, textSessionCount;
+    private TextView textCountdown, textActiveTaskName, textQuote, textSessionCount, textStrictIndicator;
     private ProgressBar progressTimer;
     private ObjectAnimator progressAnimator;
     private Button btnStartPause, btnSkip;
@@ -142,6 +142,7 @@ public class TimerActivity extends AppCompatActivity {
         Set<String> savedQuotes = quotePrefs.getStringSet("saved_quotes", new HashSet<>());
         quoteList = new ArrayList<>(savedQuotes);
 
+        textStrictIndicator = findViewById(R.id.text_strict_indicator);
         textActiveTaskName = findViewById(R.id.text_active_task_name);
         textCountdown = findViewById(R.id.text_countdown);
         textSessionCount = findViewById(R.id.text_session_count);
@@ -149,6 +150,8 @@ public class TimerActivity extends AppCompatActivity {
         progressTimer = findViewById(R.id.progress_timer);
         btnStartPause = findViewById(R.id.btn_start_pause);
         btnSkip = findViewById(R.id.btn_skip);
+
+        textStrictIndicator.setVisibility(isStrictMode ? View.VISIBLE : View.GONE);
 
         if (currentTask != null) {
             textSessionCount.setText("Session: " + currentCompletedSessions + " / " + currentTask.getEstimatedPomodoros());
@@ -214,7 +217,7 @@ public class TimerActivity extends AppCompatActivity {
         }
 
         progressTimer.setMax((int) maxTimerValue);
-        
+
         if (isRunning) {
             if (progressAnimator != null && progressAnimator.isRunning()) {
                 progressAnimator.cancel();
