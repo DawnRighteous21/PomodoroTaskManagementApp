@@ -58,12 +58,14 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
             displayName = "[DEV] " + displayName;
         }
 
+
+        androidx.cardview.widget.CardView cardView = (androidx.cardview.widget.CardView) holder.itemView;
         if (currentTask.getId() == activeTaskId) {
-            holder.itemView.setBackgroundColor(android.graphics.Color.parseColor("#E0F7FA"));
+            cardView.setCardBackgroundColor(android.graphics.Color.parseColor("#FFEBEE"));
             holder.taskName.setTypeface(null, android.graphics.Typeface.BOLD);
             holder.taskName.setText(displayName + " (Active)");
         } else {
-            holder.itemView.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+            cardView.setCardBackgroundColor(android.graphics.Color.WHITE);
             holder.taskName.setTypeface(null, android.graphics.Typeface.NORMAL);
             holder.taskName.setText(displayName);
         }

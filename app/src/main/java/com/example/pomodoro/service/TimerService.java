@@ -103,7 +103,7 @@ public class TimerService extends Service {
         ContextCompat.registerReceiver(
                 this,
                 phoneStateReceiver,
-                new IntentFilter("android.intent.action.PHONE_STATE"),
+                  new IntentFilter("android.intent.action.PHONE_STATE"),
                 ContextCompat.RECEIVER_EXPORTED
         );
     }

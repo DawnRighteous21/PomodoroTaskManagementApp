@@ -1,16 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Background track -->
     <item>
         <shape android:shape="ring" android:thicknessRatio="15" android:useLevel="false">
-            <solid android:color="#E0E0E0" />
+            <solid android:color="#F0F0F0" />
         </shape>
     </item>
-    <!-- Progress track -->
     <item>
         <rotate android:fromDegrees="270" android:toDegrees="270">
             <shape android:shape="ring" android:thicknessRatio="15" android:useLevel="true">
-                <solid android:color="#FF6347" />
+                <gradient
+                    android:angle="0"
+                    android:endColor="#FF3D00"
+                    android:startColor="#FFC400"
+                    android:type="sweep" />
             </shape>
         </rotate>
     </item>

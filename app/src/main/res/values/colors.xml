@@ -2,4 +2,10 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <color name="pomodoro_primary">#E53935</color>
+    <color name="pomodoro_secondary">#FFCDD2</color>
+    <color name="pomodoro_accent">#FF5722</color>
+
+    <color name="task_active_bg">#FFEBEE</color>
 </resources>

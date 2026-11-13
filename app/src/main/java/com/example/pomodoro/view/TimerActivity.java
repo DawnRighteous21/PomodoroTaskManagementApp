@@ -1,5 +1,10 @@
 package com.example.pomodoro.view;
 
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import android.widget.ImageButton;
+import android.widget.Toast;
+import java.util.HashMap;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -35,6 +40,7 @@ import retrofit2.Response;
 
 public class TimerActivity extends AppCompatActivity {
 
+    private com.airbnb.lottie.LottieAnimationView lottieAnimation;
     private TextView textCountdown, textActiveTaskName, textQuote, textSessionCount, textStrictIndicator;
     private ProgressBar progressTimer;
     private ObjectAnimator progressAnimator;
@@ -54,6 +60,10 @@ public class TimerActivity extends AppCompatActivity {
     private Handler quoteHandler = new Handler(Looper.getMainLooper());
     private int currentQuoteIndex = 0;
     private List<String> quoteList = new ArrayList<>();
+    private ImageButton btnFavoriteQuote;
+    private DatabaseReference mDatabase;
+    private Quote currentDisplayedQuote = null;
+    private boolean isCurrentQuoteSaved = false;
 
     private Runnable quoteRunnable = new Runnable() {
         @Override
@@ -142,6 +152,7 @@ public class TimerActivity extends AppCompatActivity {
         Set<String> savedQuotes = quotePrefs.getStringSet("saved_quotes", new HashSet<>());
         quoteList = new ArrayList<>(savedQuotes);
 
+        lottieAnimation = findViewById(R.id.lottie_animation);
         textStrictIndicator = findViewById(R.id.text_strict_indicator);
         textActiveTaskName = findViewById(R.id.text_active_task_name);
         textCountdown = findViewById(R.id.text_countdown);
@@ -150,6 +161,12 @@ public class TimerActivity extends AppCompatActivity {
         progressTimer = findViewById(R.id.progress_timer);
         btnStartPause = findViewById(R.id.btn_start_pause);
         btnSkip = findViewById(R.id.btn_skip);
+        btnFavoriteQuote = findViewById(R.id.btn_favorite_quote);
+
+        String dbUrl = "https://pomodoro-3cf47-default-rtdb.asia-southeast1.firebasedatabase.app/";
+        mDatabase = FirebaseDatabase.getInstance(dbUrl).getReference("favorite_quotes");
+        btnFavoriteQuote.setOnClickListener(v -> saveQuoteToFirebase());
+        mDatabase.keepSynced(true);
 
         textStrictIndicator.setVisibility(isStrictMode ? View.VISIBLE : View.GONE);
 
@@ -242,20 +259,28 @@ public class TimerActivity extends AppCompatActivity {
         int seconds = (int) (timeInSeconds % 60);
         textCountdown.setText(String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds));
 
-        if (!isWork && !currentlyOnBreak) {
-            currentlyOnBreak = true;
-            textActiveTaskName.setText("Break Time!");
-            if (!quoteList.isEmpty()) {
-                textQuote.setText(quoteList.get(0));
-            } else {
-                textQuote.setText("");
+        if (!isWork) {
+            if (!currentlyOnBreak) {
+                currentlyOnBreak = true;
+                if (currentTask != null) textActiveTaskName.setText("Break Time!");
+
+                if (lottieAnimation != null) lottieAnimation.setVisibility(View.VISIBLE);
+
+                if (textQuote != null) textQuote.setText("Đang tải trích dẫn...");
+                if (btnFavoriteQuote != null) btnFavoriteQuote.setVisibility(View.GONE);
+
+                startQuoteCycling();
+                fetchAPIQuote();
             }
-            fetchAPIQuote();
-            startQuoteCycling();
-        } else if (isWork && currentlyOnBreak) {
-            currentlyOnBreak = false;
-            if (currentTask != null) textActiveTaskName.setText(currentTask.getName());
-            stopQuoteCycling();
+        } else {
+            if (currentlyOnBreak) {
+                currentlyOnBreak = false;
+                if (lottieAnimation != null) lottieAnimation.setVisibility(View.GONE);
+                if (currentTask != null) textActiveTaskName.setText(currentTask.getName());
+
+                stopQuoteCycling();
+                if (btnFavoriteQuote != null) btnFavoriteQuote.setVisibility(View.GONE);
+            }
         }
 
         if (isRunning) {
@@ -288,22 +313,91 @@ public class TimerActivity extends AppCompatActivity {
         quoteApi.getRandomQuote().enqueue(new Callback<List<Quote>>() {
             @Override
             public void onResponse(Call<List<Quote>> call, Response<List<Quote>> response) {
-                if (response.isSuccessful() && response.body() != null && !response.body().isEmpty()) {
-                    Quote quote = response.body().get(0);
-                    String newQuote = "\"" + quote.getText() + "\"\n- " + quote.getAuthor();
+                runOnUiThread(() -> {
+                    if (response.isSuccessful() && response.body() != null && !response.body().isEmpty()) {
+                        currentDisplayedQuote = response.body().get(0);
 
-                    if (!quoteList.contains(newQuote)) {
-                        quoteList.add(newQuote);
-                        if (quoteList.size() > 5) quoteList.remove(0);
+                        if (currentDisplayedQuote.getText() == null || currentDisplayedQuote.getText().contains("Too many requests")) {
+                            handleQuoteError("API đang bận. Hãy nghỉ ngơi thật tốt nhé!");
+                            return;
+                        }
 
-                        SharedPreferences prefs = getSharedPreferences("quote_cache", MODE_PRIVATE);
-                        prefs.edit().putStringSet("saved_quotes", new HashSet<>(quoteList)).apply();
+                        String newQuote = "\"" + currentDisplayedQuote.getText() + "\"\n- " + currentDisplayedQuote.getAuthor();
+
+                        if (textQuote != null) {
+                            textQuote.setText(newQuote);
+                        }
+
+                        if (btnFavoriteQuote != null && currentlyOnBreak) {
+                            btnFavoriteQuote.setVisibility(View.VISIBLE);
+                            btnFavoriteQuote.setImageResource(android.R.drawable.star_off);
+                        }
+                        isCurrentQuoteSaved = false;
+
+                        if (!quoteList.contains(newQuote)) {
+                            quoteList.add(newQuote);
+                            if (quoteList.size() > 5) quoteList.remove(0);
+
+                            SharedPreferences prefs = getSharedPreferences("quote_cache", MODE_PRIVATE);
+                            prefs.edit().putStringSet("saved_quotes", new HashSet<>(quoteList)).apply();
+                        }
+                    } else {
+                        handleQuoteError("Không thể tải trích dẫn lúc này.\nHãy nhắm mắt thư giãn nhé!");
                     }
-                }
+                });
             }
+
             @Override
-            public void onFailure(Call<List<Quote>> call, Throwable t) {}
+            public void onFailure(Call<List<Quote>> call, Throwable t) {
+                runOnUiThread(() -> {
+                    handleQuoteError("Mất kết nối mạng.\nHãy uống một ngụm nước nhé!");
+                    android.util.Log.e("API_ERROR", "Lỗi tải quote", t);
+                });
+            }
         });
+    }
+
+    private void handleQuoteError(String fallbackMessage) {
+        if (textQuote != null) {
+            textQuote.setText(fallbackMessage);
+        }
+        if (btnFavoriteQuote != null) {
+            btnFavoriteQuote.setVisibility(View.GONE);
+        }
+        currentDisplayedQuote = null;
+    }
+
+    private void saveQuoteToFirebase() {
+        if (currentDisplayedQuote == null) {
+            Toast.makeText(this, "Lỗi: Dữ liệu Quote đang trống (null)!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (isCurrentQuoteSaved) {
+            Toast.makeText(this, "Bạn đã lưu câu này rồi!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Toast.makeText(this, "Đang gửi lên Firebase...", Toast.LENGTH_SHORT).show();
+
+        String pushId = mDatabase.push().getKey();
+        if (pushId != null) {
+            HashMap<String, String> quoteData = new HashMap<>();
+            quoteData.put("text", currentDisplayedQuote.getText());
+            quoteData.put("author", currentDisplayedQuote.getAuthor());
+
+            mDatabase.child(pushId).setValue(quoteData, (error, ref) -> {
+                if (error != null) {
+                    Toast.makeText(TimerActivity.this, "Lỗi Firebase: " + error.getMessage(), Toast.LENGTH_LONG).show();
+                    android.util.Log.e("FIREBASE_TEST", "Lỗi: " + error.getMessage());
+                } else {
+                    btnFavoriteQuote.setImageResource(android.R.drawable.star_on);
+                    isCurrentQuoteSaved = true;
+                    Toast.makeText(TimerActivity.this, "Đã lưu vào mây thành công!", Toast.LENGTH_SHORT).show();
+                    android.util.Log.d("FIREBASE_TEST", "Lưu thành công ID: " + pushId);
+                }
+            });
+        }
     }
 
     private void showReadyToFocusDialog() {
