@@ -1,0 +1,3302 @@
+﻿=== DIRECTORY TREE ===
+- main/
+    - AndroidManifest.xml
+    - java/
+        - com/
+            - example/
+                - pomodoro/
+                    - MainActivity.java
+                    - data/
+                        - AppDatabase.java
+                        - DailyStatDao.java
+                        - TaskDao.java
+                        - TaskRepository.java
+                        - TaskSessionDao.java
+                    - model/
+                        - DailyStat.java
+                        - Quote.java
+                        - Task.java
+                        - TaskSession.java
+                        - TaskStatDTO.java
+                    - network/
+                        - QuoteApi.java
+                        - RetrofitClient.java
+                    - service/
+                        - TimerService.java
+                    - view/
+                        - FavoritesFragment.java
+                        - HomeFragment.java
+                        - SettingsFragment.java
+                        - StatAdapter.java
+                        - StatisticsActivity.java
+                        - StatisticsFragment.java
+                        - TaskAdapter.java
+                        - TimerActivity.java
+                    - viewmodel/
+                        - TaskViewModel.java
+    - keepRules/
+        - rules.keep
+    - res/
+        - drawable/
+            - bg_pomodoro_badge.xml
+            - circular_progress.xml
+            - ic_launcher_background.xml
+            - ic_launcher_foreground.xml
+        - layout/
+            - activity_main.xml
+            - activity_statistics.xml
+            - activity_timer.xml
+            - dialog_add_task.xml
+            - dialog_bottom_sheet_tasks.xml
+            - fragment_favorites.xml
+            - fragment_home.xml
+            - fragment_settings.xml
+            - fragment_statistics.xml
+            - item_daily_stat.xml
+            - item_task.xml
+            - item_task_detail.xml
+        - menu/
+            - bottom_nav_menu.xml
+            - drawer_menu.xml
+        - mipmap-anydpi-v26/
+            - ic_launcher.xml
+            - ic_launcher_round.xml
+        - mipmap-hdpi/
+            - ic_launcher.webp
+            - ic_launcher_round.webp
+        - mipmap-mdpi/
+            - ic_launcher.webp
+            - ic_launcher_round.webp
+        - mipmap-xhdpi/
+            - ic_launcher.webp
+            - ic_launcher_round.webp
+        - mipmap-xxhdpi/
+            - ic_launcher.webp
+            - ic_launcher_round.webp
+        - mipmap-xxxhdpi/
+            - ic_launcher.webp
+            - ic_launcher_round.webp
+        - raw/
+            - relax_anim.json
+        - values/
+            - colors.xml
+            - strings.xml
+            - themes.xml
+        - values-night/
+            - themes.xml
+        - xml/
+            - backup_rules.xml
+            - data_extraction_rules.xml
+
+
+=== FILE CONTENTS ===
+
+### File: AndroidManifest.xml
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Pomodoro">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".view.TimerActivity" />
+        <activity android:name=".view.StatisticsActivity" />
+        <service android:name=".service.TimerService" android:foregroundServiceType="specialUse" android:exported="false" />
+    </application>
+
+</manifest>
+
+```
+
+### File: java/com/example/pomodoro/MainActivity.java
+```java
+package com.example.pomodoro;
+
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.os.Build;
+import android.os.Bundle;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.fragment.app.Fragment;
+
+import com.example.pomodoro.view.FavoritesFragment;
+import com.example.pomodoro.view.HomeFragment;
+import com.example.pomodoro.view.SettingsFragment;
+import com.example.pomodoro.view.StatisticsFragment;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
+
+public class MainActivity extends AppCompatActivity {
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED ||
+                    ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS, Manifest.permission.READ_PHONE_STATE}, 101);
+            }
+        } else {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_PHONE_STATE}, 101);
+            }
+        }
+
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle("Pomodoro");
+        }
+
+        BottomNavigationView bottomNav = findViewById(R.id.bottom_navigation);
+        bottomNav.setOnItemSelectedListener(item -> {
+            Fragment selectedFragment = null;
+            int itemId = item.getItemId();
+
+            if (itemId == R.id.nav_home) {
+                selectedFragment = new HomeFragment();
+                getSupportActionBar().setTitle("Công việc");
+            } else if (itemId == R.id.nav_statistics) {
+                selectedFragment = new StatisticsFragment();
+                getSupportActionBar().setTitle("Thống kê theo ngày");
+            } else if (itemId == R.id.nav_favorites) {
+                // Thêm dòng này để xử lý Tab 4
+                selectedFragment = new FavoritesFragment();
+                getSupportActionBar().setTitle("Bộ sưu tập");
+            } else if (itemId == R.id.nav_settings) {
+                selectedFragment = new SettingsFragment();
+                getSupportActionBar().setTitle("Cài đặt");
+            }
+
+            if (selectedFragment != null) {
+                getSupportFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, selectedFragment)
+                        .commit();
+            }
+            return true;
+        });
+
+        if (savedInstanceState == null) {
+            bottomNav.setSelectedItemId(R.id.nav_home);
+        }
+    }
+}
+```
+
+### File: java/com/example/pomodoro/data/AppDatabase.java
+```java
+package com.example.pomodoro.data;
+
+import android.content.Context;
+import androidx.room.Database;
+import androidx.room.Room;
+import androidx.room.RoomDatabase;
+import com.example.pomodoro.model.DailyStat;
+import com.example.pomodoro.model.Task;
+import com.example.pomodoro.model.TaskSession;
+
+
+@Database(entities = {Task.class, DailyStat.class, TaskSession.class}, version = 5, exportSchema = false)
+public abstract class AppDatabase extends RoomDatabase {
+    private static AppDatabase instance;
+
+    public abstract TaskDao taskDao();
+    public abstract DailyStatDao dailyStatDao();
+    public abstract TaskSessionDao taskSessionDao();
+
+    public static synchronized AppDatabase getInstance(Context context) {
+        if (instance == null) {
+            instance = Room.databaseBuilder(context.getApplicationContext(),
+                            AppDatabase.class, "pomodoro_database")
+                    .fallbackToDestructiveMigration()
+                    .build();
+        }
+        return instance;
+    }
+}
+```
+
+### File: java/com/example/pomodoro/data/DailyStatDao.java
+```java
+package com.example.pomodoro.data;
+
+import androidx.lifecycle.LiveData;
+import androidx.room.Dao;
+import androidx.room.Insert;
+import androidx.room.OnConflictStrategy;
+import androidx.room.Query;
+import com.example.pomodoro.model.DailyStat;
+import java.util.List;
+
+@Dao
+public interface DailyStatDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void insert(DailyStat stat);
+
+    @Query("SELECT * FROM daily_stats WHERE date = :date LIMIT 1")
+    DailyStat getStatByDate(String date);
+
+    @Query("SELECT * FROM daily_stats ORDER BY date DESC LIMIT 30")
+    LiveData<List<DailyStat>> getLast30DaysStats();
+}
+```
+
+### File: java/com/example/pomodoro/data/TaskDao.java
+```java
+package com.example.pomodoro.data;
+
+import androidx.lifecycle.LiveData;
+import androidx.room.Dao;
+import androidx.room.Delete;
+import androidx.room.Insert;
+import androidx.room.Query;
+import androidx.room.Update;
+import com.example.pomodoro.model.Task;
+import java.util.List;
+
+@Dao
+public interface TaskDao {
+    @Insert
+    void insert(Task task);
+
+    @Update
+    void update(Task task);
+
+    @Delete
+    void delete(Task task);
+
+    @Query("SELECT * FROM tasks ORDER BY id DESC")
+    LiveData<List<Task>> getAllTasks();
+
+    @Query("SELECT * FROM tasks WHERE id = :taskId")
+    Task getTaskById(int taskId);
+}
+```
+
+### File: java/com/example/pomodoro/data/TaskRepository.java
+```java
+package com.example.pomodoro.data;
+
+import android.app.Application;
+import androidx.lifecycle.LiveData;
+import com.example.pomodoro.model.Task;
+import com.example.pomodoro.model.TaskSession;
+import com.example.pomodoro.model.TaskStatDTO;
+import com.example.pomodoro.model.DailyStat;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public class TaskRepository {
+    private TaskDao taskDao;
+    private DailyStatDao dailyStatDao;
+    private TaskSessionDao taskSessionDao;
+    private LiveData<List<Task>> allTasks;
+    private ExecutorService executorService;
+
+    public TaskRepository(Application application) {
+        AppDatabase database = AppDatabase.getInstance(application);
+        taskDao = database.taskDao();
+        dailyStatDao = database.dailyStatDao();
+        taskSessionDao = database.taskSessionDao();
+        allTasks = taskDao.getAllTasks();
+        executorService = Executors.newSingleThreadExecutor();
+    }
+
+    public LiveData<List<Task>> getAllTasks() {
+        return allTasks;
+    }
+
+    public void insert(Task task) {
+        executorService.execute(() -> taskDao.insert(task));
+    }
+
+    public void update(Task task) {
+        executorService.execute(() -> taskDao.update(task));
+    }
+
+    public void delete(Task task) {
+        executorService.execute(() -> taskDao.delete(task));
+    }
+
+    public void incrementPomodoroCount(int taskId) {
+        executorService.execute(() -> {
+            Task task = taskDao.getTaskById(taskId);
+            if (task != null && !task.isCompleted()) {
+                int newCount = task.getCompletedPomodoros() + 1;
+                task.setCompletedPomodoros(newCount);
+
+                if (newCount >= task.getEstimatedPomodoros()) {
+                    task.setCompleted(true);
+                }
+                taskDao.update(task);
+            }
+        });
+    }
+    public LiveData<List<DailyStat>> getLast30DaysStats() {
+        return dailyStatDao.getLast30DaysStats();
+    }
+
+    public void logSession(String date, String taskName, int workMinutes) {
+        executorService.execute(() -> {
+            DailyStat stat = dailyStatDao.getStatByDate(date);
+            if (stat == null) {
+                stat = new DailyStat(date, 1, workMinutes);
+            } else {
+                stat.setTotalPomodoros(stat.getTotalPomodoros() + 1);
+                stat.setTotalWorkMinutes(stat.getTotalWorkMinutes() + workMinutes);
+            }
+            dailyStatDao.insert(stat);
+
+            taskSessionDao.insert(new TaskSession(date, taskName, workMinutes));
+        });
+    }
+
+    public LiveData<List<TaskStatDTO>> getTasksForDate(String date) {
+        return taskSessionDao.getTasksForDate(date);
+    }
+}
+```
+
+### File: java/com/example/pomodoro/data/TaskSessionDao.java
+```java
+package com.example.pomodoro.data;
+
+import androidx.lifecycle.LiveData;
+import androidx.room.Dao;
+import androidx.room.Insert;
+import androidx.room.Query;
+import com.example.pomodoro.model.TaskSession;
+import com.example.pomodoro.model.TaskStatDTO;
+import java.util.List;
+
+@Dao
+public interface TaskSessionDao {
+    @Insert
+    void insert(TaskSession session);
+
+    @Query("SELECT taskName, COUNT(id) as pomodoros, SUM(workMinutes) as totalMinutes " +
+            "FROM task_sessions WHERE date = :date GROUP BY taskName")
+    LiveData<List<TaskStatDTO>> getTasksForDate(String date);
+}
+```
+
+### File: java/com/example/pomodoro/model/DailyStat.java
+```java
+package com.example.pomodoro.model;
+
+import androidx.annotation.NonNull;
+import androidx.room.Entity;
+import androidx.room.PrimaryKey;
+
+@Entity(tableName = "daily_stats")
+public class DailyStat {
+    @PrimaryKey
+    @NonNull
+    private String date;
+    private int totalPomodoros;
+    private int totalWorkMinutes;
+
+    public DailyStat(@NonNull String date, int totalPomodoros, int totalWorkMinutes) {
+        this.date = date;
+        this.totalPomodoros = totalPomodoros;
+        this.totalWorkMinutes = totalWorkMinutes;
+    }
+
+    @NonNull
+    public String getDate() { return date; }
+    public void setDate(@NonNull String date) { this.date = date; }
+    public int getTotalPomodoros() { return totalPomodoros; }
+    public void setTotalPomodoros(int totalPomodoros) { this.totalPomodoros = totalPomodoros; }
+    public int getTotalWorkMinutes() { return totalWorkMinutes; }
+    public void setTotalWorkMinutes(int totalWorkMinutes) { this.totalWorkMinutes = totalWorkMinutes; }
+}
+```
+
+### File: java/com/example/pomodoro/model/Quote.java
+```java
+package com.example.pomodoro.model;
+
+import com.google.gson.annotations.SerializedName;
+
+public class Quote {
+    @SerializedName("q")
+    private String text;
+
+    @SerializedName("a")
+    private String author;
+
+    // Getters
+    public String getText() { return text; }
+    public String getAuthor() { return author; }
+}
+```
+
+### File: java/com/example/pomodoro/model/Task.java
+```java
+package com.example.pomodoro.model;
+
+import androidx.room.Entity;
+import androidx.room.PrimaryKey;
+import java.io.Serializable;
+
+@Entity(tableName = "tasks")
+public class Task implements Serializable {
+    @PrimaryKey(autoGenerate = true)
+    private int id;
+    private String name;
+    private int estimatedPomodoros;
+    private int completedPomodoros;
+    private boolean isCompleted;
+    private int workDuration;
+    private int breakDuration;
+    private boolean isDevTask;
+
+    public Task(String name, int estimatedPomodoros, int workDuration, int breakDuration, boolean isDevTask) {
+        this.name = name;
+        this.estimatedPomodoros = estimatedPomodoros;
+        this.workDuration = workDuration;
+        this.breakDuration = breakDuration;
+        this.isDevTask = isDevTask;
+        this.completedPomodoros = 0;
+        this.isCompleted = false;
+    }
+
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public int getEstimatedPomodoros() { return estimatedPomodoros; }
+    public void setEstimatedPomodoros(int estimatedPomodoros) { this.estimatedPomodoros = estimatedPomodoros; }
+    public int getCompletedPomodoros() { return completedPomodoros; }
+    public void setCompletedPomodoros(int completedPomodoros) { this.completedPomodoros = completedPomodoros; }
+    public boolean isCompleted() { return isCompleted; }
+    public void setCompleted(boolean completed) { this.isCompleted = completed; }
+    public int getWorkDuration() { return workDuration; }
+    public void setWorkDuration(int workDuration) { this.workDuration = workDuration; }
+    public int getBreakDuration() { return breakDuration; }
+    public void setBreakDuration(int breakDuration) { this.breakDuration = breakDuration; }
+    public boolean isDevTask() { return isDevTask; }
+    public void setDevTask(boolean devTask) { isDevTask = devTask; }
+}
+```
+
+### File: java/com/example/pomodoro/model/TaskSession.java
+```java
+package com.example.pomodoro.model;
+
+import androidx.room.Entity;
+import androidx.room.PrimaryKey;
+
+@Entity(tableName = "task_sessions")
+public class TaskSession {
+    @PrimaryKey(autoGenerate = true)
+    private int id;
+    private String date;
+    private String taskName;
+    private int workMinutes;
+
+    public TaskSession(String date, String taskName, int workMinutes) {
+        this.date = date;
+        this.taskName = taskName;
+        this.workMinutes = workMinutes;
+    }
+
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
+    public String getDate() { return date; }
+    public String getTaskName() { return taskName; }
+    public int getWorkMinutes() { return workMinutes; }
+}
+```
+
+### File: java/com/example/pomodoro/model/TaskStatDTO.java
+```java
+package com.example.pomodoro.model;
+
+public class TaskStatDTO {
+    public String taskName;
+    public int pomodoros;
+    public int totalMinutes;
+}
+```
+
+### File: java/com/example/pomodoro/network/QuoteApi.java
+```java
+package com.example.pomodoro.network;
+
+import com.example.pomodoro.model.Quote;
+import java.util.List;
+import retrofit2.Call;
+import retrofit2.http.GET;
+
+public interface QuoteApi {
+    @GET("api/random")
+    Call<List<Quote>> getRandomQuote();
+}
+```
+
+### File: java/com/example/pomodoro/network/RetrofitClient.java
+```java
+package com.example.pomodoro.network;
+
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
+
+public class RetrofitClient {
+    private static final String BASE_URL = "https://zenquotes.io/";
+    private static Retrofit retrofit = null;
+
+    public static Retrofit getClient() {
+        if (retrofit == null) {
+            retrofit = new Retrofit.Builder()
+                    .baseUrl(BASE_URL)
+                    .addConverterFactory(GsonConverterFactory.create())
+                    .build();
+        }
+        return retrofit;
+    }
+}
+```
+
+### File: java/com/example/pomodoro/service/TimerService.java
+```java
+package com.example.pomodoro.service;
+
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.app.Service;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.SharedPreferences;
+import android.os.Build;
+import android.os.CountDownTimer;
+import android.os.Handler;
+import android.os.IBinder;
+import android.os.Looper;
+import androidx.annotation.Nullable;
+import androidx.core.app.NotificationCompat;
+import androidx.core.content.ContextCompat;
+import com.example.pomodoro.MainActivity;
+import com.example.pomodoro.R;
+import com.example.pomodoro.data.TaskRepository;
+import com.example.pomodoro.view.TimerActivity;
+import com.example.pomodoro.model.Task;
+import java.util.Locale;
+
+public class TimerService extends Service {
+    public static boolean isServiceRunning = false;
+
+    public static final String ACTION_START = "START";
+    public static final String ACTION_PAUSE = "PAUSE";
+    public static final String ACTION_SKIP = "SKIP";
+    public static final String ACTION_REQUEST_STATE = "REQUEST_STATE";
+    public static final String ACTION_START_GRACE = "START_GRACE";
+    public static final String ACTION_CANCEL_GRACE = "CANCEL_GRACE";
+    public static final String ACTION_CLEAR_PENALTY = "CLEAR_PENALTY";
+    public static final String ACTION_FORCE_STOP = "FORCE_STOP";
+    public static final String UPDATE_BROADCAST = "com.example.pomodoro.TIMER_UPDATE";
+
+    private static final String CHANNEL_ID = "TimerChannel";
+    private static final String ALERT_CHANNEL_ID = "AlertChannel";
+
+    private CountDownTimer timer;
+    private TaskRepository repository;
+    private NotificationManager notificationManager;
+
+    private boolean isWorkSession = true;
+    private boolean isRunning = false;
+    private long timeLeftInMillis = 0;
+    private long workTimeInMillis = 0;
+    private long breakTimeInMillis = 0;
+
+    private int taskId = -1;
+    private String taskName = "";
+    private int completedSessions = 0;
+    private int estimatedSessions = 1;
+    private boolean isStrictMode = false;
+    private int storedWorkMins = 25;
+    private int storedBreakMins = 5;
+    private boolean isDevTask = false;
+
+    private boolean penaltyApplied = false;
+    private boolean wasPausedForCall = false;
+    private Handler strictHandler = new Handler(Looper.getMainLooper());
+    private Runnable strictRunnable = () -> {
+        if (isWorkSession && isRunning) {
+            if (timer != null) timer.cancel();
+            isRunning = false;
+            timeLeftInMillis = workTimeInMillis;
+            penaltyApplied = true;
+            updateForegroundNotification();
+            sendHighPriorityAlert("Strict Mode Failed", "Focus lost! Timer reset.");
+            broadcastUpdate(false, false);
+        }
+    };
+
+    private BroadcastReceiver phoneStateReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String state = intent.getStringExtra(android.telephony.TelephonyManager.EXTRA_STATE);
+            if (android.telephony.TelephonyManager.EXTRA_STATE_RINGING.equals(state) ||
+                    android.telephony.TelephonyManager.EXTRA_STATE_OFFHOOK.equals(state)) {
+
+                strictHandler.removeCallbacks(strictRunnable);
+
+                if (isRunning && isWorkSession) {
+                    wasPausedForCall = true;
+                    pauseTimer();
+                }
+            }
+        }
+    };
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        isServiceRunning = true;
+        repository = new TaskRepository(getApplication());
+        notificationManager = getSystemService(NotificationManager.class);
+        createNotificationChannels();
+
+        ContextCompat.registerReceiver(
+                this,
+                phoneStateReceiver,
+                  new IntentFilter("android.intent.action.PHONE_STATE"),
+                ContextCompat.RECEIVER_EXPORTED
+        );
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null && intent.getAction() != null) {
+
+            Task task = (Task) intent.getSerializableExtra("EXTRA_TASK");
+            if (task != null) {
+                boolean isTaskChanging = (taskId != -1 && taskId != task.getId());
+
+                taskId = task.getId();
+                taskName = task.getName();
+                estimatedSessions = task.getEstimatedPomodoros();
+                storedWorkMins = task.getWorkDuration();
+                storedBreakMins = task.getBreakDuration();
+                isDevTask = task.isDevTask();
+
+                completedSessions = intent.getIntExtra("EXTRA_COMPLETED", completedSessions);
+                isStrictMode = intent.getBooleanExtra("EXTRA_STRICT_MODE", isStrictMode);
+
+                long newWorkTime = isDevTask ? storedWorkMins * 1000L : storedWorkMins * 60000L;
+                long newBreakTime = isDevTask ? storedBreakMins * 1000L : storedBreakMins * 60000L;
+
+                if (isTaskChanging || timeLeftInMillis == 0 || workTimeInMillis != newWorkTime || breakTimeInMillis != newBreakTime) {
+                    if (timer != null) timer.cancel();
+                    isRunning = false;
+                    isWorkSession = true;
+                    timeLeftInMillis = newWorkTime;
+                }
+
+                workTimeInMillis = newWorkTime;
+                breakTimeInMillis = newBreakTime;
+            }
+
+            switch (intent.getAction()) {
+                case ACTION_START:
+                    wasPausedForCall = false;
+                    penaltyApplied = false;
+                    if (!isRunning) {
+                        saveActiveTaskState();
+                        startForegroundNotification();
+                        startTimer();
+                    }
+                    break;
+                case ACTION_PAUSE:
+                    pauseTimer();
+                    break;
+                case ACTION_SKIP:
+                    if (timer != null) timer.cancel();
+                    isRunning = false;
+
+                    if (isWorkSession) {
+                        isWorkSession = false;
+                        timeLeftInMillis = breakTimeInMillis;
+                        saveActiveTaskState();
+                        startForegroundNotification();
+                        startTimer();
+                    } else {
+                        isWorkSession = true;
+                        timeLeftInMillis = workTimeInMillis;
+                        broadcastUpdate(false, true);
+                        stopForeground(true);
+                    }
+                    break;
+                case ACTION_REQUEST_STATE:
+                    broadcastUpdate(false, false);
+                    break;
+                case ACTION_START_GRACE:
+                    if (isStrictMode && isWorkSession && isRunning) {
+                        strictHandler.postDelayed(strictRunnable, 5000);
+                    }
+                    break;
+                case ACTION_CANCEL_GRACE:
+                    strictHandler.removeCallbacks(strictRunnable);
+                    break;
+                case ACTION_CLEAR_PENALTY:
+                    penaltyApplied = false;
+                    break;
+                case ACTION_FORCE_STOP:
+                    if (timer != null) timer.cancel();
+                    isRunning = false;
+                    timeLeftInMillis = 0;
+                    workTimeInMillis = 0;
+                    breakTimeInMillis = 0;
+                    taskId = -1;
+                    clearActiveTaskState();
+                    stopForeground(true);
+                    stopSelf();
+                    break;
+            }
+        }
+        return START_STICKY;
+    }
+
+    private void saveActiveTaskState() {
+        SharedPreferences prefs = getSharedPreferences("TimerPrefs", Context.MODE_PRIVATE);
+        prefs.edit()
+                .putInt("activeTaskId", taskId)
+                .putString("activeTaskName", taskName)
+                .putInt("activeTaskCompleted", completedSessions)
+                .putInt("activeTaskEstimated", estimatedSessions)
+                .putBoolean("activeTaskStrict", isStrictMode)
+                .putInt("activeTaskWorkDur", storedWorkMins)
+                .putInt("activeTaskBreakDur", storedBreakMins)
+                .putBoolean("activeTaskIsDev", isDevTask)
+                .apply();
+    }
+
+    private void clearActiveTaskState() {
+        SharedPreferences prefs = getSharedPreferences("TimerPrefs", Context.MODE_PRIVATE);
+        prefs.edit().putInt("activeTaskId", -1).apply();
+    }
+
+    private void startTimer() {
+        isRunning = true;
+        timer = new CountDownTimer(timeLeftInMillis, 1000) {
+            @Override
+            public void onTick(long millisUntilFinished) {
+                timeLeftInMillis = millisUntilFinished;
+                updateForegroundNotification();
+                broadcastUpdate(false, false);
+            }
+
+            @Override
+            public void onFinish() {
+                handleSessionEnd();
+            }
+        }.start();
+        broadcastUpdate(false, false);
+    }
+
+    private void pauseTimer() {
+        if (timer != null) timer.cancel();
+        isRunning = false;
+        updateForegroundNotification();
+        broadcastUpdate(false, false);
+    }
+
+    private void handleSessionEnd() {
+        isRunning = false;
+
+        if (isWorkSession) {
+            completedSessions++;
+            saveActiveTaskState();
+            if (taskId != -1) repository.incrementPomodoroCount(taskId);
+
+            String today = new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new java.util.Date());
+            repository.logSession(today, taskName, storedWorkMins);
+
+            if (completedSessions >= estimatedSessions) {
+                clearActiveTaskState();
+                sendHighPriorityAlert("Task Complete!", "You have finished all Pomodoros for this task.");
+                broadcastUpdate(true, false);
+                stopForeground(true);
+                stopSelf();
+                return;
+            }
+
+            sendHighPriorityAlert("Work Complete!", "Time for your break.");
+            isWorkSession = false;
+            timeLeftInMillis = breakTimeInMillis;
+            startTimer();
+        } else {
+            sendHighPriorityAlert("Break Over!", "Ready to focus again?");
+            isWorkSession = true;
+            timeLeftInMillis = workTimeInMillis;
+            broadcastUpdate(false, true);
+            stopForeground(true);
+        }
+    }
+
+    private void broadcastUpdate(boolean taskFinished, boolean breakJustFinished) {
+        Intent intent = new Intent(UPDATE_BROADCAST);
+        intent.setPackage(getPackageName());
+        intent.putExtra("TIME_LEFT", timeLeftInMillis);
+        intent.putExtra("MAX_TIME", isWorkSession ? workTimeInMillis : breakTimeInMillis);
+        intent.putExtra("IS_WORK", isWorkSession);
+        intent.putExtra("IS_RUNNING", isRunning);
+        intent.putExtra("COMPLETED_COUNT", completedSessions);
+        intent.putExtra("TASK_FINISHED", taskFinished);
+        intent.putExtra("BREAK_JUST_FINISHED", breakJustFinished);
+        intent.putExtra("STRICT_PENALTY_APPLIED", penaltyApplied);
+        intent.putExtra("PAUSED_FOR_CALL", wasPausedForCall);
+        sendBroadcast(intent);
+    }
+
+    private void startForegroundNotification() {
+        Notification notification = buildNotification();
+        if (Build.VERSION.SDK_INT >= 34) {
+            startForeground(1, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+        } else {
+            startForeground(1, notification);
+        }
+    }
+
+    private void updateForegroundNotification() {
+        notificationManager.notify(1, buildNotification());
+    }
+
+    private Notification buildNotification() {
+        long timeInSeconds = (long) Math.ceil(timeLeftInMillis / 1000.0);
+        int minutes = (int) (timeInSeconds / 60);
+        int seconds = (int) (timeInSeconds % 60);
+        String timeStr = String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds);
+        String state = isWorkSession ? "Working on: " : "Break from: ";
+
+        Intent clickIntent = new Intent(this, TimerActivity.class);
+        clickIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        
+        Task currentTask = new Task(taskName, estimatedSessions, storedWorkMins, storedBreakMins, isDevTask);
+        currentTask.setId(taskId);
+        currentTask.setCompletedPomodoros(completedSessions);
+        
+        clickIntent.putExtra("EXTRA_TASK", currentTask);
+        clickIntent.putExtra("EXTRA_STRICT_MODE", isStrictMode);
+
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, clickIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        return new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle(state + taskName)
+                .setContentText("Time left: " + timeStr)
+                .setSmallIcon(R.mipmap.ic_launcher_round)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setContentIntent(pendingIntent)
+                .setSilent(true)
+                .build();
+    }
+
+    private void sendHighPriorityAlert(String title, String message) {
+        Intent clickIntent = new Intent(this, TimerActivity.class);
+        clickIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        
+        Task currentTask = new Task(taskName, estimatedSessions, storedWorkMins, storedBreakMins, isDevTask);
+        currentTask.setId(taskId);
+        currentTask.setCompletedPomodoros(completedSessions);
+        
+        clickIntent.putExtra("EXTRA_TASK", currentTask);
+        clickIntent.putExtra("EXTRA_STRICT_MODE", isStrictMode);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 1, clickIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        NotificationCompat.Builder alert = new NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
+                .setContentTitle(title)
+                .setContentText(message)
+                .setSmallIcon(R.mipmap.ic_launcher_round)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .setDefaults(Notification.DEFAULT_ALL);
+        notificationManager.notify(2, alert.build());
+    }
+
+    private void createNotificationChannels() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel bgChannel = new NotificationChannel(
+                    CHANNEL_ID, "Timer Service", NotificationManager.IMPORTANCE_LOW);
+
+            NotificationChannel alertChannel = new NotificationChannel(
+                    ALERT_CHANNEL_ID, "Session Alerts", NotificationManager.IMPORTANCE_HIGH);
+
+            if (notificationManager != null) {
+                notificationManager.createNotificationChannel(bgChannel);
+                notificationManager.createNotificationChannel(alertChannel);
+            }
+        }
+    }
+
+    @Nullable
+    @Override
+    public IBinder onBind(Intent intent) { return null; }
+
+    @Override
+    public void onDestroy() {
+        isServiceRunning = false;
+        if (timer != null) timer.cancel();
+        unregisterReceiver(phoneStateReceiver);
+        super.onDestroy();
+    }
+}
+```
+
+### File: java/com/example/pomodoro/view/FavoritesFragment.java
+```java
+package com.example.pomodoro.view;
+
+import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import com.example.pomodoro.R;
+
+public class FavoritesFragment extends Fragment {
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        return inflater.inflate(R.layout.fragment_favorites, container, false);
+    }
+}
+```
+
+### File: java/com/example/pomodoro/view/HomeFragment.java
+```java
+package com.example.pomodoro.view;
+
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.EditText;
+import android.widget.TextView;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
+import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+import com.example.pomodoro.R;
+import com.example.pomodoro.model.Task;
+import com.example.pomodoro.service.TimerService;
+import com.example.pomodoro.viewmodel.TaskViewModel;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import java.util.List;
+
+public class HomeFragment extends Fragment {
+
+    private TaskViewModel taskViewModel;
+    private RecyclerView recyclerView;
+    private TextView textDevIndicator;
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        View view = inflater.inflate(R.layout.fragment_home, container, false);
+
+        textDevIndicator = view.findViewById(R.id.text_dev_indicator);
+        recyclerView = view.findViewById(R.id.recycler_view_tasks);
+        recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
+        recyclerView.setHasFixedSize(true);
+
+        TaskAdapter adapter = new TaskAdapter();
+        recyclerView.setAdapter(adapter);
+
+        adapter.setOnItemClickListener(new TaskAdapter.OnItemClickListener() {
+            @Override
+            public void onItemClick(Task task) {
+                int runningId = requireActivity().getSharedPreferences("TimerPrefs", Context.MODE_PRIVATE).getInt("activeTaskId", -1);
+                if (runningId != -1 && runningId != task.getId()) {
+                    new AlertDialog.Builder(requireContext())
+                            .setTitle("Chuyển công việc?")
+                            .setMessage("Một công việc khác đang chạy. Bạn có muốn dừng nó và chuyển sang công việc này không?")
+                            .setPositiveButton("Chuyển", (dialog, which) -> {
+                                Intent stopIntent = new Intent(requireContext(), TimerService.class);
+                                stopIntent.setAction(TimerService.ACTION_FORCE_STOP);
+                                requireActivity().startService(stopIntent);
+                                launchTimer(task);
+                            })
+                            .setNegativeButton("Hủy", null)
+                            .show();
+                    return;
+                }
+
+                if (task.isCompleted()) {
+                    new AlertDialog.Builder(requireContext())
+                            .setTitle("Task Completed")
+                            .setMessage("Do you want to restart this task from session 0?")
+                            .setPositiveButton("Restart", (dialog, which) -> {
+                                task.setCompletedPomodoros(0);
+                                task.setCompleted(false);
+                                taskViewModel.update(task);
+                                launchTimer(task);
+                            })
+                            .setNegativeButton("Cancel", null)
+                            .show();
+                    return;
+                }
+                launchTimer(task);
+            }
+
+            @Override
+            public void onItemLongClick(Task task) {
+                new AlertDialog.Builder(requireContext())
+                        .setTitle("Tùy chọn")
+                        .setPositiveButton("Sửa", (dialog, which) -> showTaskDialog(task))
+                        .setNegativeButton("Xóa", (dialog, which) -> {
+                            new AlertDialog.Builder(requireContext())
+                                    .setTitle("Xác nhận")
+                                    .setMessage("Bạn có chắc chắn muốn xóa công việc này?")
+                                    .setPositiveButton("Xóa", (confirmDialog, confirmWhich) -> {
+                                        int runningId = requireActivity().getSharedPreferences("TimerPrefs", Context.MODE_PRIVATE).getInt("activeTaskId", -1);
+                                        if (runningId == task.getId()) {
+                                            Intent stopIntent = new Intent(requireContext(), TimerService.class);
+                                            stopIntent.setAction(TimerService.ACTION_FORCE_STOP);
+                                            requireActivity().startService(stopIntent);
+                                            adapter.setActiveTaskId(-1);
+                                        }
+                                        taskViewModel.delete(task);
+                                    })
+                                    .setNegativeButton("Hủy", null)
+                                    .show();
+                        })
+                        .setNeutralButton("Hủy", null)
+                        .show();
+            }
+        });
+
+        taskViewModel = new ViewModelProvider(requireActivity()).get(TaskViewModel.class);
+        taskViewModel.getAllTasks().observe(getViewLifecycleOwner(), adapter::setTasks);
+
+        FloatingActionButton fab = view.findViewById(R.id.fab_add_task);
+        fab.setOnClickListener(v -> showTaskDialog(null));
+
+        return view;
+    }
+
+    private void updateDevModeUI(boolean isDev) {
+        if (textDevIndicator != null) {
+            textDevIndicator.setVisibility(isDev ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    private void launchTimer(Task task) {
+        boolean isStrictMode = requireActivity().getSharedPreferences("TimerPrefs", Context.MODE_PRIVATE).getBoolean("strict_mode", false);
+        Intent intent = new Intent(requireContext(), TimerActivity.class);
+        intent.putExtra("EXTRA_TASK", task);
+        intent.putExtra("EXTRA_STRICT_MODE", isStrictMode);
+        startActivity(intent);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        SharedPreferences prefs = requireActivity().getSharedPreferences("TimerPrefs", Context.MODE_PRIVATE);
+        updateDevModeUI(prefs.getBoolean("dev_mode", false));
+
+        if (!TimerService.isServiceRunning) {
+            prefs.edit().putInt("activeTaskId", -1).apply();
+        }
+
+        int activeTaskId = prefs.getInt("activeTaskId", -1);
+        if (recyclerView != null && recyclerView.getAdapter() instanceof TaskAdapter) {
+            ((TaskAdapter) recyclerView.getAdapter()).setActiveTaskId(activeTaskId);
+        }
+    }
+
+    private void showTaskDialog(Task existingTask) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle(existingTask == null ? "Thêm công việc mới" : "Sửa công việc");
+
+        View view = getLayoutInflater().inflate(R.layout.dialog_add_task, null);
+        EditText editTaskName = view.findViewById(R.id.edit_task_name);
+        EditText editPomodoros = view.findViewById(R.id.edit_estimated_pomodoros);
+        EditText editWorkTime = view.findViewById(R.id.edit_work_time);
+        EditText editBreakTime = view.findViewById(R.id.edit_break_time);
+        TextView textWorkLabel = view.findViewById(R.id.text_work_label);
+        TextView textBreakLabel = view.findViewById(R.id.text_break_label);
+
+        boolean isDevTaskMode = existingTask != null ? existingTask.isDevTask() : requireActivity().getSharedPreferences("TimerPrefs", Context.MODE_PRIVATE).getBoolean("dev_mode", false);
+
+        if (isDevTaskMode) {
+            textWorkLabel.setText("Làm việc (giây)");
+            textBreakLabel.setText("Nghỉ ngơi (giây)");
+        }
+
+        if (existingTask != null) {
+            editTaskName.setText(existingTask.getName());
+            editPomodoros.setText(String.valueOf(existingTask.getEstimatedPomodoros()));
+            editWorkTime.setText(String.valueOf(existingTask.getWorkDuration()));
+            editBreakTime.setText(String.valueOf(existingTask.getBreakDuration()));
+        }
+
+        builder.setView(view);
+        builder.setPositiveButton("Lưu", null);
+        builder.setNegativeButton("Hủy", (dialog, which) -> dialog.dismiss());
+        AlertDialog dialog = builder.create();
+        dialog.show();
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String name = editTaskName.getText().toString().trim();
+            String pomodoroStr = editPomodoros.getText().toString().trim();
+            String workStr = editWorkTime.getText().toString().trim();
+            String breakStr = editBreakTime.getText().toString().trim();
+
+            if (name.isEmpty() || pomodoroStr.isEmpty() || workStr.isEmpty() || breakStr.isEmpty()) {
+                new AlertDialog.Builder(requireContext()).setTitle("Lỗi").setMessage("Vui lòng nhập đầy đủ thông tin").setPositiveButton("OK", null).show();
+                return;
+            }
+
+            List<Task> currentTasks = ((TaskAdapter) recyclerView.getAdapter()).getTasks();
+            for (Task t : currentTasks) {
+                if (t.getName().equalsIgnoreCase(name) && (existingTask == null || existingTask.getId() != t.getId())) {
+                    new AlertDialog.Builder(requireContext()).setTitle("Lỗi").setMessage("Tên công việc này đã tồn tại!").setPositiveButton("OK", null).show();
+                    return;
+                }
+            }
+
+            int pomodoros = Integer.parseInt(pomodoroStr);
+            int workMins = Integer.parseInt(workStr);
+            int breakMins = Integer.parseInt(breakStr);
+
+            if (pomodoros < 1) { new AlertDialog.Builder(requireContext()).setTitle("Lỗi").setMessage("Số phiên dự kiến phải lớn hơn 0").setPositiveButton("OK", null).show(); return; }
+            if (workMins < 1) { new AlertDialog.Builder(requireContext()).setTitle("Lỗi").setMessage("Thời gian làm việc phải lớn hơn 0").setPositiveButton("OK", null).show(); return; }
+            if (breakMins < 1) { new AlertDialog.Builder(requireContext()).setTitle("Lỗi").setMessage("Thời gian nghỉ phải lớn hơn 0").setPositiveButton("OK", null).show(); return; }
+
+            if (!isDevTaskMode) {
+                if (workMins < 10 || workMins > 90) { new AlertDialog.Builder(requireContext()).setTitle("Lỗi").setMessage("Thời gian làm việc phải từ 10 - 90 phút").setPositiveButton("OK", null).show(); return; }
+                if (breakMins < 1 || breakMins > 30) { new AlertDialog.Builder(requireContext()).setTitle("Lỗi").setMessage("Thời gian nghỉ phải từ 1 - 30 phút").setPositiveButton("OK", null).show(); return; }
+            }
+
+            if (existingTask == null) {
+                taskViewModel.insert(new Task(name, pomodoros, workMins, breakMins, isDevTaskMode));
+            } else {
+                existingTask.setName(name);
+                existingTask.setEstimatedPomodoros(pomodoros);
+                existingTask.setWorkDuration(workMins);
+                existingTask.setBreakDuration(breakMins);
+                taskViewModel.update(existingTask);
+
+                int runningId = requireActivity().getSharedPreferences("TimerPrefs", Context.MODE_PRIVATE).getInt("activeTaskId", -1);
+                if (runningId == existingTask.getId()) {
+                    Intent stopIntent = new Intent(requireContext(), TimerService.class);
+                    stopIntent.setAction(TimerService.ACTION_FORCE_STOP);
+                    requireActivity().startService(stopIntent);
+                    new AlertDialog.Builder(requireContext()).setTitle("Thông báo").setMessage("Công việc đang chạy đã được cập nhật và dừng lại.").setPositiveButton("OK", null).show();
+                }
+            }
+            dialog.dismiss();
+        });
+    }
+}
+```
+
+### File: java/com/example/pomodoro/view/SettingsFragment.java
+```java
+package com.example.pomodoro.view;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Button;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.widget.SwitchCompat;
+import androidx.fragment.app.Fragment;
+import com.example.pomodoro.R;
+
+public class SettingsFragment extends Fragment {
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        View view = inflater.inflate(R.layout.fragment_settings, container, false);
+
+        SwitchCompat switchStrictMode = view.findViewById(R.id.switch_strict_mode);
+        SwitchCompat switchDevMode = view.findViewById(R.id.switch_dev_mode);
+        Button btnHelp = view.findViewById(R.id.btn_help);
+
+        SharedPreferences prefs = requireActivity().getSharedPreferences("TimerPrefs", Context.MODE_PRIVATE);
+        switchStrictMode.setChecked(prefs.getBoolean("strict_mode", false));
+        switchDevMode.setChecked(prefs.getBoolean("dev_mode", false));
+
+        switchStrictMode.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked && buttonView.isPressed()) {
+                new AlertDialog.Builder(requireContext())
+                        .setTitle("Enable Strict Mode?")
+                        .setMessage("Trong chế độ Strict Mode, bạn không thể bấm tạm dừng. Rời ứng dụng quá 5 giây sẽ bị mất toàn bộ tiến độ đếm ngược. Bạn có chắc chắn không?")
+                        .setPositiveButton("Bật", (dialog, which) -> prefs.edit().putBoolean("strict_mode", true).apply())
+                        .setNegativeButton("Hủy", (dialog, which) -> switchStrictMode.setChecked(false))
+                        .setCancelable(false)
+                        .show();
+            } else if (!isChecked) {
+                prefs.edit().putBoolean("strict_mode", false).apply();
+            }
+        });
+
+        switchDevMode.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            prefs.edit().putBoolean("dev_mode", isChecked).apply();
+        });
+
+        btnHelp.setOnClickListener(v -> {
+            new AlertDialog.Builder(requireContext())
+                    .setTitle("Hướng dẫn sử dụng")
+                    .setMessage("1. Thêm công việc: Bấm dấu + ở trang chủ để lên lịch.\n\n2. Bắt đầu đếm: Bấm vào một công việc để vào màn hình tập trung. Đồng hồ sẽ chạy ngầm ngay cả khi bạn tắt màn hình.\n\n3. Strict Mode: Để rèn tính kỷ luật, khi bật chế độ này nếu bạn thoát ra lướt Facebook quá 5 giây, đồng hồ sẽ lập tức bị hủy kết quả.\n\n4. Thống kê: Xem lại lịch sử các khoảng thời gian tập trung để cải thiện năng suất bản thân.")
+                    .setPositiveButton("Đã hiểu", null)
+                    .show();
+        });
+
+        return view;
+    }
+}
+```
+
+### File: java/com/example/pomodoro/view/StatAdapter.java
+```java
+package com.example.pomodoro.view;
+
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.TextView;
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
+import com.example.pomodoro.R;
+import com.example.pomodoro.model.DailyStat;
+import java.util.ArrayList;
+import java.util.List;
+
+
+public class StatAdapter extends RecyclerView.Adapter<StatAdapter.StatViewHolder> {
+    public interface OnItemClickListener {
+        void onItemClick(String date);
+    }
+    private OnItemClickListener listener;
+
+    public void setOnItemClickListener(OnItemClickListener listener) {
+        this.listener = listener;
+    }
+    private List<DailyStat> stats = new ArrayList<>();
+
+    @NonNull
+    @Override
+    public StatViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View itemView = LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.item_daily_stat, parent, false);
+        return new StatViewHolder(itemView);
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull StatViewHolder holder, int position) {
+        DailyStat stat = stats.get(position);
+        holder.textDate.setText("Ngày: " + stat.getDate());
+        holder.textPomodoros.setText(stat.getTotalPomodoros() + " phiên (Pomo)");
+        holder.textMinutes.setText(stat.getTotalWorkMinutes() + " phút tập trung");
+        holder.itemView.setOnClickListener(v -> {
+            if (listener != null) {
+                listener.onItemClick(stat.getDate());
+            }
+        });
+    }
+
+    @Override
+    public int getItemCount() { return stats.size(); }
+
+    public void setStats(List<DailyStat> stats) {
+        this.stats = stats;
+        notifyDataSetChanged();
+    }
+
+    class StatViewHolder extends RecyclerView.ViewHolder {
+        private TextView textDate, textPomodoros, textMinutes;
+        public StatViewHolder(@NonNull View itemView) {
+            super(itemView);
+            textDate = itemView.findViewById(R.id.text_stat_date);
+            textPomodoros = itemView.findViewById(R.id.text_stat_pomodoros);
+            textMinutes = itemView.findViewById(R.id.text_stat_minutes);
+        }
+    }
+}
+```
+
+### File: java/com/example/pomodoro/view/StatisticsActivity.java
+```java
+package com.example.pomodoro.view;
+
+import android.view.LayoutInflater;
+import android.view.View;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
+import android.os.Bundle;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+import com.example.pomodoro.R;
+import com.example.pomodoro.model.TaskStatDTO;
+import com.example.pomodoro.viewmodel.TaskViewModel;
+import java.util.List;
+
+public class StatisticsActivity extends AppCompatActivity {
+    private TaskViewModel taskViewModel;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_statistics);
+
+        Toolbar toolbar = findViewById(R.id.toolbar_statistics);
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle("Thống kê theo ngày");
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
+
+        RecyclerView recyclerView = findViewById(R.id.recycler_statistics);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        recyclerView.setHasFixedSize(true);
+
+        StatAdapter adapter = new StatAdapter();
+        recyclerView.setAdapter(adapter);
+
+        taskViewModel = new ViewModelProvider(this).get(TaskViewModel.class);
+        taskViewModel.getLast30DaysStats().observe(this, adapter::setStats);
+
+        adapter.setOnItemClickListener(date -> {
+            taskViewModel.getTasksForDate(date).observe(StatisticsActivity.this, new androidx.lifecycle.Observer<List<TaskStatDTO>>() {
+                @Override
+                public void onChanged(List<TaskStatDTO> taskStats) {
+                    taskViewModel.getTasksForDate(date).removeObserver(this);
+                    showTasksDialog(date, taskStats);
+                }
+            });
+        });
+    }
+
+    private void showTasksDialog(String date, List<TaskStatDTO> taskStats) {
+        BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(this);
+        View view = getLayoutInflater().inflate(R.layout.dialog_bottom_sheet_tasks, null);
+        bottomSheetDialog.setContentView(view);
+
+        TextView textTitle = view.findViewById(R.id.text_dialog_title);
+        textTitle.setText("Chi tiết công việc ngày " + date);
+
+        LinearLayout container = view.findViewById(R.id.layout_tasks_container);
+
+        if (taskStats == null || taskStats.isEmpty()) {
+            TextView emptyText = new TextView(this);
+            emptyText.setText("Không có dữ liệu công việc.");
+            emptyText.setPadding(0, 16, 0, 16);
+            container.addView(emptyText);
+        } else {
+            for (TaskStatDTO t : taskStats) {
+                View item = getLayoutInflater().inflate(R.layout.item_task_detail, container, false);
+
+                TextView textName = item.findViewById(R.id.text_detail_task_name);
+                TextView textPomos = item.findViewById(R.id.text_detail_pomodoros);
+                TextView textMins = item.findViewById(R.id.text_detail_minutes);
+
+                textName.setText(t.taskName);
+                textPomos.setText("🍅 " + t.pomodoros + " phiên");
+                textMins.setText("⏱ " + t.totalMinutes + " phút");
+
+                container.addView(item);
+            }
+        }
+
+        bottomSheetDialog.show();
+    }
+
+    @Override
+    public boolean onSupportNavigateUp() {
+        finish();
+        return true;
+    }
+}
+```
+
+### File: java/com/example/pomodoro/view/StatisticsFragment.java
+```java
+package com.example.pomodoro.view;
+
+import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+import com.example.pomodoro.R;
+import com.example.pomodoro.model.TaskStatDTO;
+import com.example.pomodoro.viewmodel.TaskViewModel;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
+import java.util.List;
+
+public class StatisticsFragment extends Fragment {
+
+    private TaskViewModel taskViewModel;
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        View view = inflater.inflate(R.layout.fragment_statistics, container, false);
+
+        RecyclerView recyclerView = view.findViewById(R.id.recycler_statistics);
+        recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
+        recyclerView.setHasFixedSize(true);
+
+        StatAdapter adapter = new StatAdapter();
+        recyclerView.setAdapter(adapter);
+
+        taskViewModel = new ViewModelProvider(requireActivity()).get(TaskViewModel.class);
+        taskViewModel.getLast30DaysStats().observe(getViewLifecycleOwner(), adapter::setStats);
+
+        adapter.setOnItemClickListener(date -> {
+            taskViewModel.getTasksForDate(date).observe(getViewLifecycleOwner(), new androidx.lifecycle.Observer<List<TaskStatDTO>>() {
+                @Override
+                public void onChanged(List<TaskStatDTO> taskStats) {
+                    taskViewModel.getTasksForDate(date).removeObserver(this);
+                    showTasksDialog(date, taskStats);
+                }
+            });
+        });
+
+        return view;
+    }
+
+    private void showTasksDialog(String date, List<TaskStatDTO> taskStats) {
+        BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(requireContext());
+        View view = getLayoutInflater().inflate(R.layout.dialog_bottom_sheet_tasks, null);
+        bottomSheetDialog.setContentView(view);
+
+        TextView textTitle = view.findViewById(R.id.text_dialog_title);
+        textTitle.setText("Chi tiết công việc ngày " + date);
+
+        LinearLayout container = view.findViewById(R.id.layout_tasks_container);
+
+        if (taskStats == null || taskStats.isEmpty()) {
+            TextView emptyText = new TextView(requireContext());
+            emptyText.setText("Không có dữ liệu công việc.");
+            emptyText.setPadding(0, 16, 0, 16);
+            container.addView(emptyText);
+        } else {
+            for (TaskStatDTO t : taskStats) {
+                View item = getLayoutInflater().inflate(R.layout.item_task_detail, container, false);
+                TextView textName = item.findViewById(R.id.text_detail_task_name);
+                TextView textPomos = item.findViewById(R.id.text_detail_pomodoros);
+                TextView textMins = item.findViewById(R.id.text_detail_minutes);
+
+                textName.setText(t.taskName);
+                textPomos.setText("🍅 " + t.pomodoros + " phiên");
+                textMins.setText("⏱ " + t.totalMinutes + " phút");
+
+                container.addView(item);
+            }
+        }
+        bottomSheetDialog.show();
+    }
+}
+```
+
+### File: java/com/example/pomodoro/view/TaskAdapter.java
+```java
+package com.example.pomodoro.view;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.CheckBox;
+import android.widget.TextView;
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
+import com.example.pomodoro.R;
+import com.example.pomodoro.model.Task;
+import java.util.ArrayList;
+import java.util.List;
+
+public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder> {
+    private List<Task> tasks = new ArrayList<>();
+    private OnItemClickListener listener;
+    private int activeTaskId = -1;
+
+    public interface OnItemClickListener {
+        void onItemClick(Task task);
+        void onItemLongClick(Task task);
+    }
+
+    public void setOnItemClickListener(OnItemClickListener listener) {
+        this.listener = listener;
+    }
+
+    public void setActiveTaskId(int id) {
+        this.activeTaskId = id;
+        notifyDataSetChanged();
+    }
+
+    public List<Task> getTasks() {
+        return tasks;
+    }
+
+    @NonNull
+    @Override
+    public TaskViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View itemView = LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.item_task, parent, false);
+        return new TaskViewHolder(itemView);
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull TaskViewHolder holder, int position) {
+        Task currentTask = tasks.get(position);
+
+        String countText = currentTask.getCompletedPomodoros() + "/" + currentTask.getEstimatedPomodoros();
+        holder.pomodoroCount.setText(countText);
+        holder.checkBox.setChecked(currentTask.isCompleted());
+
+        String displayName = currentTask.getName();
+        if (currentTask.isDevTask()) {
+            displayName = "[DEV] " + displayName;
+        }
+
+
+        androidx.cardview.widget.CardView cardView = (androidx.cardview.widget.CardView) holder.itemView;
+        if (currentTask.getId() == activeTaskId) {
+            cardView.setCardBackgroundColor(android.graphics.Color.parseColor("#FFEBEE"));
+            holder.taskName.setTypeface(null, android.graphics.Typeface.BOLD);
+            holder.taskName.setText(displayName + " (Active)");
+        } else {
+            cardView.setCardBackgroundColor(android.graphics.Color.WHITE);
+            holder.taskName.setTypeface(null, android.graphics.Typeface.NORMAL);
+            holder.taskName.setText(displayName);
+        }
+
+        holder.itemView.setOnClickListener(v -> {
+            if (listener != null) {
+                listener.onItemClick(currentTask);
+            }
+        });
+        holder.itemView.setOnLongClickListener(v -> {
+            if (listener != null) {
+                listener.onItemLongClick(currentTask);
+            }
+            return true;
+        });
+    }
+
+    @Override
+    public int getItemCount() {
+        return tasks.size();
+    }
+
+    public void setTasks(List<Task> tasks) {
+        this.tasks = tasks;
+        notifyDataSetChanged();
+    }
+
+    class TaskViewHolder extends RecyclerView.ViewHolder {
+        private TextView taskName;
+        private TextView pomodoroCount;
+        private CheckBox checkBox;
+
+        public TaskViewHolder(@NonNull View itemView) {
+            super(itemView);
+            taskName = itemView.findViewById(R.id.text_task_name);
+            pomodoroCount = itemView.findViewById(R.id.text_pomodoro_count);
+            checkBox = itemView.findViewById(R.id.checkbox_task);
+        }
+    }
+}
+```
+
+### File: java/com/example/pomodoro/view/TimerActivity.java
+```java
+package com.example.pomodoro.view;
+
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import android.widget.ImageButton;
+import android.widget.Toast;
+import java.util.HashMap;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.SharedPreferences;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.View;
+import android.widget.Button;
+import android.animation.ObjectAnimator;
+import android.view.animation.LinearInterpolator;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
+import androidx.appcompat.widget.Toolbar;
+import com.example.pomodoro.R;
+import com.example.pomodoro.model.Quote;
+import com.example.pomodoro.network.QuoteApi;
+import com.example.pomodoro.network.RetrofitClient;
+import com.example.pomodoro.service.TimerService;
+import com.example.pomodoro.model.Task;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+
+public class TimerActivity extends AppCompatActivity {
+
+    private com.airbnb.lottie.LottieAnimationView lottieAnimation;
+    private TextView textCountdown, textActiveTaskName, textQuote, textSessionCount, textStrictIndicator;
+    private ProgressBar progressTimer;
+    private ObjectAnimator progressAnimator;
+    private Button btnStartPause, btnSkip;
+
+    private Task currentTask;
+    private int currentCompletedSessions;
+    private boolean isStrictMode;
+    private boolean currentlyOnBreak = false;
+    private boolean isTimerRunning = false;
+    private long maxTimerValue = 1500000;
+
+    private boolean penaltyDialogShowing = false;
+    private boolean callDialogShowing = false;
+    private boolean breakDialogShowing = false;
+
+    private Handler quoteHandler = new Handler(Looper.getMainLooper());
+    private int currentQuoteIndex = 0;
+    private List<String> quoteList = new ArrayList<>();
+    private ImageButton btnFavoriteQuote;
+    private DatabaseReference mDatabase;
+    private Quote currentDisplayedQuote = null;
+    private boolean isCurrentQuoteSaved = false;
+
+    private Runnable quoteRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (quoteList.size() > 1) {
+                textQuote.animate().alpha(0f).setDuration(500).withEndAction(() -> {
+                    currentQuoteIndex = (currentQuoteIndex + 1) % quoteList.size();
+                    textQuote.setText(quoteList.get(currentQuoteIndex));
+                    textQuote.animate().alpha(1f).setDuration(500);
+                });
+            }
+            quoteHandler.postDelayed(this, 45000);
+        }
+    };
+
+    private BroadcastReceiver timerReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            long timeLeft = intent.getLongExtra("TIME_LEFT", 0);
+            maxTimerValue = intent.getLongExtra("MAX_TIME", 1500000);
+            boolean isWork = intent.getBooleanExtra("IS_WORK", true);
+            isTimerRunning = intent.getBooleanExtra("IS_RUNNING", false);
+
+            currentCompletedSessions = intent.getIntExtra("COMPLETED_COUNT", currentCompletedSessions);
+
+            boolean hasPenalty = intent.getBooleanExtra("STRICT_PENALTY_APPLIED", false);
+            boolean pausedForCall = intent.getBooleanExtra("PAUSED_FOR_CALL", false);
+
+            if (intent.getBooleanExtra("TASK_FINISHED", false)) {
+                updateUI(0, true, false, currentCompletedSessions);
+                showCongratsDialog();
+                return;
+            }
+            if (intent.getBooleanExtra("BREAK_JUST_FINISHED", false) && !breakDialogShowing) {
+                breakDialogShowing = true;
+                showReadyToFocusDialog();
+            }
+
+            if (hasPenalty && !penaltyDialogShowing) {
+                penaltyDialogShowing = true;
+                sendCommandToService(TimerService.ACTION_CLEAR_PENALTY);
+                new androidx.appcompat.app.AlertDialog.Builder(TimerActivity.this)
+                        .setTitle("Strict Mode Failed")
+                        .setMessage("You lost focus for too long! Your timer has been paused and reset.")
+                        .setCancelable(false)
+                        .setPositiveButton("I Understand", (d, w) -> penaltyDialogShowing = false)
+                        .show();
+            }
+
+            if (pausedForCall && !isTimerRunning && !callDialogShowing && !currentlyOnBreak) {
+                callDialogShowing = true;
+                new androidx.appcompat.app.AlertDialog.Builder(TimerActivity.this)
+                        .setTitle("Phone Call Ended")
+                        .setMessage("Your timer was paused for a phone call. Ready to resume?")
+                        .setCancelable(false)
+                        .setPositiveButton("Resume Focus", (d, w) -> {
+                            callDialogShowing = false;
+                            sendCommandToService(TimerService.ACTION_START);
+                        })
+                        .show();
+            }
+
+            updateUI(timeLeft, isWork, isTimerRunning, currentCompletedSessions);
+        }
+    };
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_timer);
+
+        Toolbar toolbar = findViewById(R.id.toolbar_timer);
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle("");
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
+
+        currentTask = (Task) getIntent().getSerializableExtra("EXTRA_TASK");
+        if (currentTask != null) {
+            currentCompletedSessions = currentTask.getCompletedPomodoros();
+        }
+        isStrictMode = getIntent().getBooleanExtra("EXTRA_STRICT_MODE", false);
+
+        SharedPreferences quotePrefs = getSharedPreferences("quote_cache", MODE_PRIVATE);
+        Set<String> savedQuotes = quotePrefs.getStringSet("saved_quotes", new HashSet<>());
+        quoteList = new ArrayList<>(savedQuotes);
+
+        lottieAnimation = findViewById(R.id.lottie_animation);
+        textStrictIndicator = findViewById(R.id.text_strict_indicator);
+        textActiveTaskName = findViewById(R.id.text_active_task_name);
+        textCountdown = findViewById(R.id.text_countdown);
+        textSessionCount = findViewById(R.id.text_session_count);
+        textQuote = findViewById(R.id.text_quote);
+        progressTimer = findViewById(R.id.progress_timer);
+        btnStartPause = findViewById(R.id.btn_start_pause);
+        btnSkip = findViewById(R.id.btn_skip);
+        btnFavoriteQuote = findViewById(R.id.btn_favorite_quote);
+
+        String dbUrl = "https://pomodoro-3cf47-default-rtdb.asia-southeast1.firebasedatabase.app/";
+        mDatabase = FirebaseDatabase.getInstance().getReference("favorite_quotes");
+        btnFavoriteQuote.setOnClickListener(v -> saveQuoteToFirebase());
+
+        textStrictIndicator.setVisibility(isStrictMode ? View.VISIBLE : View.GONE);
+
+        if (currentTask != null) {
+            textSessionCount.setText("Session: " + currentCompletedSessions + " / " + currentTask.getEstimatedPomodoros());
+            textActiveTaskName.setText(currentTask.getName());
+
+            long initialTime = currentTask.getWorkDuration() * (currentTask.isDevTask() ? 1000L : 60000L);
+            progressTimer.setMax((int) initialTime);
+            progressTimer.setProgress((int) initialTime);
+            long timeInSeconds = (long) Math.ceil(initialTime / 1000.0);
+            int minutes = (int) (timeInSeconds / 60);
+            int seconds = (int) (timeInSeconds % 60);
+            textCountdown.setText(String.format(java.util.Locale.getDefault(), "%02d:%02d", minutes, seconds));
+        }
+
+        btnStartPause.setOnClickListener(v -> {
+            if (btnStartPause.getText().toString().equals("Pause")) {
+                sendCommandToService(TimerService.ACTION_PAUSE);
+            } else {
+                sendCommandToService(TimerService.ACTION_START);
+            }
+        });
+
+        btnSkip.setOnClickListener(v -> sendCommandToService(TimerService.ACTION_SKIP));
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        ContextCompat.registerReceiver(
+                this,
+                timerReceiver,
+                new IntentFilter(TimerService.UPDATE_BROADCAST),
+                ContextCompat.RECEIVER_NOT_EXPORTED
+        );
+        sendCommandToService(TimerService.ACTION_REQUEST_STATE);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        sendCommandToService(TimerService.ACTION_START_GRACE);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        sendCommandToService(TimerService.ACTION_CANCEL_GRACE);
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        unregisterReceiver(timerReceiver);
+        stopQuoteCycling();
+        if (progressAnimator != null) {
+            progressAnimator.cancel();
+        }
+    }
+
+    private void updateUI(long timeLeft, boolean isWork, boolean isRunning, int completed) {
+        if (currentTask != null) {
+            textSessionCount.setText("Session: " + completed + " / " + currentTask.getEstimatedPomodoros());
+        }
+
+        progressTimer.setMax((int) maxTimerValue);
+
+        if (isRunning) {
+            if (progressAnimator != null && progressAnimator.isRunning()) {
+                progressAnimator.cancel();
+            }
+            long targetProgress = Math.max(0, timeLeft - 1000);
+            if (Math.abs(progressTimer.getProgress() - timeLeft) > 2000) {
+                progressTimer.setProgress((int) timeLeft);
+            }
+            progressAnimator = ObjectAnimator.ofInt(progressTimer, "progress", progressTimer.getProgress(), (int) targetProgress);
+            progressAnimator.setDuration(1000);
+            progressAnimator.setInterpolator(new LinearInterpolator());
+            progressAnimator.start();
+        } else {
+            if (progressAnimator != null) {
+                progressAnimator.cancel();
+            }
+            progressTimer.setProgress((int) timeLeft);
+        }
+
+        long timeInSeconds = (long) Math.ceil(timeLeft / 1000.0);
+        int minutes = (int) (timeInSeconds / 60);
+        int seconds = (int) (timeInSeconds % 60);
+        textCountdown.setText(String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds));
+
+        if (!isWork && !currentlyOnBreak) {
+            currentlyOnBreak = true;
+            if (currentTask != null) textActiveTaskName.setText("Break Time!");
+
+            if (lottieAnimation != null) {
+                lottieAnimation.setVisibility(View.VISIBLE);
+            }
+            if (textQuote != null) {
+                textQuote.setText("Đang tải trích dẫn...");
+            }
+            if (btnFavoriteQuote != null) {
+                btnFavoriteQuote.setVisibility(View.GONE);
+            }
+            startQuoteCycling();
+        } else if (isWork && currentlyOnBreak) {
+            currentlyOnBreak = false;
+            lottieAnimation.setVisibility(View.GONE);
+            if (currentTask != null) textActiveTaskName.setText(currentTask.getName());
+            stopQuoteCycling();
+            if (btnFavoriteQuote != null) btnFavoriteQuote.setVisibility(View.GONE);
+        }
+
+        if (isRunning) {
+            if (isStrictMode || !isWork) {
+                btnStartPause.setVisibility(View.GONE);
+            } else {
+                btnStartPause.setVisibility(View.VISIBLE);
+                btnStartPause.setText("Pause");
+            }
+        } else {
+            btnStartPause.setVisibility(View.VISIBLE);
+            btnStartPause.setText("Start");
+        }
+    }
+
+    private void startQuoteCycling() {
+        quoteHandler.removeCallbacks(quoteRunnable);
+        quoteHandler.postDelayed(quoteRunnable, 45000);
+    }
+
+    private void stopQuoteCycling() {
+        quoteHandler.removeCallbacks(quoteRunnable);
+        textQuote.animate().cancel();
+        textQuote.setAlpha(1f);
+        textQuote.setText("");
+    }
+
+    private void fetchAPIQuote() {
+        QuoteApi quoteApi = RetrofitClient.getClient().create(QuoteApi.class);
+        quoteApi.getRandomQuote().enqueue(new Callback<List<Quote>>() {
+            @Override
+            public void onResponse(Call<List<Quote>> call, Response<List<Quote>> response) {
+                // Phải chạy cập nhật UI trên Main Thread
+                runOnUiThread(() -> {
+                    if (response.isSuccessful() && response.body() != null && !response.body().isEmpty()) {
+                        currentDisplayedQuote = response.body().get(0);
+
+                        if (currentDisplayedQuote.getText() == null || currentDisplayedQuote.getText().contains("Too many requests")) {
+                            handleQuoteError("API đang bận. Hãy nghỉ ngơi thật tốt nhé!");
+                            return;
+                        }
+
+                        String newQuote = "\"" + currentDisplayedQuote.getText() + "\"\n- " + currentDisplayedQuote.getAuthor();
+
+                        if (textQuote != null) {
+                            textQuote.setText(newQuote);
+                        }
+                        if (btnFavoriteQuote != null) {
+                            btnFavoriteQuote.setVisibility(View.VISIBLE);
+                            btnFavoriteQuote.setImageResource(android.R.drawable.btn_star_big_off);
+                        }
+                        isCurrentQuoteSaved = false;
+
+                        if (!quoteList.contains(newQuote)) {
+                            quoteList.add(newQuote);
+                            if (quoteList.size() > 5) quoteList.remove(0);
+
+                            SharedPreferences prefs = getSharedPreferences("quote_cache", MODE_PRIVATE);
+                            prefs.edit().putStringSet("saved_quotes", new HashSet<>(quoteList)).apply();
+                        }
+                    } else {
+                        handleQuoteError("Không thể tải trích dẫn lúc này.\nHãy nhắm mắt thư giãn nhé!");
+                    }
+                });
+            }
+
+            @Override
+            public void onFailure(Call<List<Quote>> call, Throwable t) {
+                runOnUiThread(() -> {
+                    handleQuoteError("Mất kết nối mạng.\nHãy uống một ngụm nước nhé!");
+                    android.util.Log.e("API_ERROR", "Lỗi tải quote", t);
+                });
+            }
+        });
+    }
+
+    private void handleQuoteError(String fallbackMessage) {
+        if (textQuote != null) {
+            textQuote.setText(fallbackMessage);
+        }
+        if (btnFavoriteQuote != null) {
+            btnFavoriteQuote.setVisibility(View.GONE);
+        }
+        currentDisplayedQuote = null;
+    }
+
+    private void saveQuoteToFirebase() {
+        if (currentDisplayedQuote != null && !isCurrentQuoteSaved) {
+            String pushId = mDatabase.push().getKey();
+            if (pushId != null) {
+                HashMap<String, String> quoteData = new HashMap<>();
+                quoteData.put("text", currentDisplayedQuote.getText());
+                quoteData.put("author", currentDisplayedQuote.getAuthor());
+
+                mDatabase.child(pushId).setValue(quoteData)
+                        .addOnSuccessListener(aVoid -> {
+                            btnFavoriteQuote.setImageResource(android.R.drawable.btn_star_big_on);
+                            isCurrentQuoteSaved = true;
+                            Toast.makeText(TimerActivity.this, "Đã lưu vào mây thành công!", Toast.LENGTH_SHORT).show();
+                            android.util.Log.d("FIREBASE_SUCCESS", "Data saved successfully.");
+                        })
+                        .addOnFailureListener(e -> {
+                            Toast.makeText(TimerActivity.this, "Lỗi Firebase: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                            android.util.Log.e("FIREBASE_ERROR", "Lỗi lưu data", e);
+                        });
+            }
+        } else if (isCurrentQuoteSaved) {
+            Toast.makeText(this, "Bạn đã lưu câu này rồi!", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(this, "Chưa tải xong trích dẫn, vui lòng đợi!", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void showReadyToFocusDialog() {
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Break is over")
+                .setMessage("Are you ready to start your next focus session?")
+                .setCancelable(false)
+                .setPositiveButton("Let's Go", (dialog, which) -> {
+                    breakDialogShowing = false;
+                    sendCommandToService(TimerService.ACTION_START);
+                })
+                .setNegativeButton("Wait", (dialog, which) -> breakDialogShowing = false)
+                .show();
+    }
+
+    private void showCongratsDialog() {
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Task Complete!")
+                .setMessage("You have completed all planned Pomodoro sessions for this task.")
+                .setCancelable(false)
+                .setPositiveButton("Awesome", (dialog, which) -> finish())
+                .show();
+    }
+
+    private void sendCommandToService(String action) {
+        Intent intent = new Intent(this, TimerService.class);
+        intent.setAction(action);
+
+        if (currentTask != null) {
+            currentTask.setCompletedPomodoros(currentCompletedSessions);
+            intent.putExtra("EXTRA_TASK", currentTask);
+            intent.putExtra("EXTRA_TASK_ID", currentTask.getId());
+            intent.putExtra("EXTRA_IS_DEV_TASK", currentTask.isDevTask());
+        }
+        intent.putExtra("EXTRA_COMPLETED", currentCompletedSessions);
+        intent.putExtra("EXTRA_STRICT_MODE", isStrictMode);
+
+        startService(intent);
+    }
+    public boolean onSupportNavigateUp() {
+        finish();
+        return true;
+    }
+}
+```
+
+### File: java/com/example/pomodoro/viewmodel/TaskViewModel.java
+```java
+package com.example.pomodoro.viewmodel;
+
+import android.app.Application;
+import androidx.annotation.NonNull;
+import androidx.lifecycle.AndroidViewModel;
+import androidx.lifecycle.LiveData;
+import com.example.pomodoro.data.TaskRepository;
+import com.example.pomodoro.model.Task;
+import com.example.pomodoro.model.DailyStat;
+import com.example.pomodoro.model.TaskStatDTO;
+import java.util.List;
+
+public class TaskViewModel extends AndroidViewModel {
+    private TaskRepository repository;
+    private LiveData<List<Task>> allTasks;
+
+    public TaskViewModel(@NonNull Application application) {
+        super(application);
+        repository = new TaskRepository(application);
+        allTasks = repository.getAllTasks();
+    }
+
+    public LiveData<List<Task>> getAllTasks() {
+        return allTasks;
+    }
+
+    public void insert(Task task) {
+        repository.insert(task);
+    }
+
+    public void update(Task task) {
+        repository.update(task);
+    }
+
+    public void delete(Task task) {
+        repository.delete(task);
+    }
+
+    public void incrementPomodoroCount(int taskId) {
+        repository.incrementPomodoroCount(taskId);
+    }
+    public LiveData<List<DailyStat>> getLast30DaysStats() {
+        return repository.getLast30DaysStats();
+    }
+    public LiveData<List<TaskStatDTO>> getTasksForDate(String date) {
+        return repository.getTasksForDate(date);
+    }
+}
+```
+
+### File: keepRules/rules.keep
+```keep
+# Add project specific R8 rules here.
+# AGP will combine all keep rule files in src/main/keepRules to pass to R8
+#
+# For more details, see
+#   https://d.android.com/r/tools/r8/keep-rules
+
+# If your project uses WebView with JS, uncomment the following
+# and specify the fully qualified class name to the JavaScript interface
+# class:
+#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
+#   public *;
+#}
+```
+
+### File: res/drawable/bg_pomodoro_badge.xml
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#FFEBEE" />
+    <corners android:radius="20dp" />
+    <stroke android:width="1dp" android:color="#FFCDD2" />
+</shape>
+```
+
+### File: res/drawable/circular_progress.xml
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="ring" android:thicknessRatio="15" android:useLevel="false">
+            <solid android:color="#F0F0F0" />
+        </shape>
+    </item>
+    <item>
+        <rotate android:fromDegrees="270" android:toDegrees="270">
+            <shape android:shape="ring" android:thicknessRatio="15" android:useLevel="true">
+                <gradient
+                    android:angle="0"
+                    android:endColor="#FF3D00"
+                    android:startColor="#FFC400"
+                    android:type="sweep" />
+            </shape>
+        </rotate>
+    </item>
+</layer-list>
+```
+
+### File: res/drawable/ic_launcher_background.xml
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#3DDC84"
+        android:pathData="M0,0h108v108h-108z" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M9,0L9,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M19,0L19,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M29,0L29,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M39,0L39,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M49,0L49,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M59,0L59,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M69,0L69,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M79,0L79,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M89,0L89,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M99,0L99,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,9L108,9"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,19L108,19"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,29L108,29"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,39L108,39"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,49L108,49"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,59L108,59"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,69L108,69"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,79L108,79"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,89L108,89"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,99L108,99"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M19,29L89,29"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M19,39L89,39"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M19,49L89,49"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M19,59L89,59"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M19,69L89,69"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M19,79L89,79"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M29,19L29,89"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M39,19L39,89"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M49,19L49,89"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M59,19L59,89"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M69,19L69,89"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M79,19L79,89"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+</vector>
+
+```
+
+### File: res/drawable/ic_launcher_foreground.xml
+```xml
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M31,63.928c0,0 6.4,-11 12.1,-13.1c7.2,-2.6 26,-1.4 26,-1.4l38.1,38.1L107,108.928l-32,-1L31,63.928z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="85.84757"
+                android:endY="92.4963"
+                android:startX="42.9492"
+                android:startY="49.59793"
+                android:type="linear">
+                <item
+                    android:color="#44000000"
+                    android:offset="0.0" />
+                <item
+                    android:color="#00000000"
+                    android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="nonZero"
+        android:pathData="M65.3,45.828l3.8,-6.6c0.2,-0.4 0.1,-0.9 -0.3,-1.1c-0.4,-0.2 -0.9,-0.1 -1.1,0.3l-3.9,6.7c-6.3,-2.8 -13.4,-2.8 -19.7,0l-3.9,-6.7c-0.2,-0.4 -0.7,-0.5 -1.1,-0.3C38.8,38.328 38.7,38.828 38.9,39.228l3.8,6.6C36.2,49.428 31.7,56.028 31,63.928h46C76.3,56.028 71.8,49.428 65.3,45.828zM43.4,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2c-0.3,-0.7 -0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C45.3,56.528 44.5,57.328 43.4,57.328L43.4,57.328zM64.6,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2s-0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C66.5,56.528 65.6,57.328 64.6,57.328L64.6,57.328z"
+        android:strokeWidth="1"
+        android:strokeColor="#00000000" />
+</vector>
+```
+
+### File: res/layout/activity_main.xml
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorPrimary"
+        android:theme="@style/ThemeOverlay.Material3.Dark.ActionBar" />
+
+    <FrameLayout
+        android:id="@+id/fragment_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_above="@id/bottom_navigation"
+        android:layout_below="@id/toolbar" />
+
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottom_navigation"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        app:menu="@menu/bottom_nav_menu" />
+
+</RelativeLayout>
+```
+
+### File: res/layout/activity_statistics.xml
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="0dp">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar_statistics"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorPrimary"
+        android:theme="@style/ThemeOverlay.Material3.Dark.ActionBar" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Hoạt động 30 ngày gần nhất"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:padding="16dp"
+        android:background="#E0E0E0"/>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recycler_statistics"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:padding="8dp"/>
+</LinearLayout>
+```
+
+### File: res/layout/activity_timer.xml
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar_timer"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorPrimary"
+        android:theme="@style/ThemeOverlay.Material3.Dark.ActionBar" />
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/toolbar_timer"
+        android:padding="24dp">
+
+        <TextView
+            android:id="@+id/text_strict_indicator"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentTop="true"
+            android:background="#FFCDD2"
+            android:padding="8dp"
+            android:text="STRICT MODE ACTIVE"
+            android:textAlignment="center"
+            android:textColor="#B00020"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/text_active_task_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/text_strict_indicator"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="8dp"
+            android:text="Task Name"
+            android:textSize="32sp"
+            android:textStyle="bold" />
+
+        <com.airbnb.lottie.LottieAnimationView
+            android:id="@+id/lottie_animation"
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:layout_below="@id/text_active_task_name"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="8dp"
+            app:lottie_rawRes="@raw/relax_anim"
+            app:lottie_autoPlay="true"
+            app:lottie_loop="true"
+            android:visibility="gone"/>
+
+        <TextView
+            android:id="@+id/text_session_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_above="@id/layout_timer_circle"
+            android:layout_centerHorizontal="true"
+            android:layout_marginBottom="16dp"
+            android:text="Session: 0 / 0"
+            android:textSize="24sp"
+            android:textColor="#666666" />
+
+        <RelativeLayout
+            android:id="@+id/layout_timer_circle"
+            android:layout_width="300dp"
+            android:layout_height="300dp"
+            android:layout_centerInParent="true">
+
+            <ProgressBar
+                android:id="@+id/progress_timer"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:indeterminate="false"
+                android:max="100"
+                android:progress="100"
+                android:progressDrawable="@drawable/circular_progress" />
+
+            <TextView
+                android:id="@+id/text_countdown"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:text="25:00"
+                android:textSize="56sp"
+                android:textStyle="bold" />
+        </RelativeLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/layout_timer_circle"
+            android:layout_above="@id/layout_bottom_buttons"
+            android:layout_marginTop="16dp"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <!-- Thêm ScrollView để phòng trường hợp Quote quá dài trên màn hình nhỏ -->
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <TextView
+                    android:id="@+id/text_quote"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textAlignment="center"
+                    android:textSize="18sp"
+                    android:textStyle="italic"
+                    android:paddingHorizontal="24dp"/>
+            </ScrollView>
+
+            <ImageButton
+                android:id="@+id/btn_favorite_quote"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="8dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/btn_star_big_off"
+                app:tint="#FFC107"
+                android:scaleType="fitCenter"
+                android:visibility="gone"
+                android:contentDescription="Lưu trích dẫn" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/layout_bottom_buttons"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:layout_marginBottom="32dp"
+            android:orientation="horizontal"
+            android:gravity="center">
+
+            <Button
+                android:id="@+id/btn_start_pause"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Start"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:layout_marginEnd="16dp"
+                android:paddingHorizontal="40dp"
+                android:paddingVertical="12dp"
+                android:backgroundTint="@color/pomodoro_primary"
+                app:cornerRadius="24dp"/>
+
+            <Button
+                android:id="@+id/btn_skip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Skip"
+                android:textSize="18sp"
+                android:paddingHorizontal="24dp"
+                android:paddingVertical="12dp"
+                android:backgroundTint="#757575"
+                app:cornerRadius="24dp"/>
+        </LinearLayout>
+    </RelativeLayout>
+</RelativeLayout>
+```
+
+### File: res/layout/dialog_add_task.xml
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Tên công việc"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="4dp"/>
+
+    <EditText
+        android:id="@+id/edit_task_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:inputType="textCapSentences"
+        android:textSize="22sp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Số phiên dự kiến"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="4dp"/>
+
+    <EditText
+        android:id="@+id/edit_estimated_pomodoros"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:inputType="number"
+        android:textSize="22sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:layout_marginEnd="8dp">
+
+            <TextView
+                android:id="@+id/text_work_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Làm việc (phút)"
+                android:textSize="20sp"
+                android:textStyle="bold"/>
+
+            <EditText
+                android:id="@+id/edit_work_time"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:textSize="22sp"
+                android:text="25" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:layout_marginStart="8dp">
+
+            <TextView
+                android:id="@+id/text_break_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Nghỉ ngơi (phút)"
+                android:textSize="20sp"
+                android:textStyle="bold"/>
+
+            <EditText
+                android:id="@+id/edit_break_time"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:textSize="22sp"
+                android:text="5" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>
+```
+
+### File: res/layout/dialog_bottom_sheet_tasks.xml
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@android:color/white"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center"
+        android:layout_marginBottom="16dp"
+        android:background="#E0E0E0" />
+
+    <TextView
+        android:id="@+id/text_dialog_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:text="Chi tiết ngày"
+        android:textColor="#333333"
+        android:textSize="26sp"
+        android:textStyle="bold" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <LinearLayout
+            android:id="@+id/layout_tasks_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </ScrollView>
+</LinearLayout>
+```
+
+### File: res/layout/fragment_favorites.xml
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#F5F5F5">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@android:color/white"
+        android:padding="16dp"
+        android:text="Trích dẫn truyền cảm hứng"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:elevation="2dp"/>
+
+    <TextView
+        android:id="@+id/text_empty_favorites"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:text="Chưa có trích dẫn nào được lưu.\nHãy lưu lại trong lúc nghỉ ngơi nhé!"
+        android:textAlignment="center"
+        android:textSize="18sp"
+        android:textColor="#9E9E9E"/>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recycler_favorites"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:padding="8dp"
+        android:visibility="gone"/>
+</LinearLayout>
+```
+
+### File: res/layout/fragment_home.xml
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:padding="0dp">
+
+    <TextView
+        android:id="@+id/text_dev_indicator"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#FFCDD2"
+        android:padding="8dp"
+        android:text="DEV MODE ACTIVE"
+        android:textAlignment="center"
+        android:textColor="#B00020"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recycler_view_tasks"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/text_dev_indicator"
+        android:layout_marginTop="8dp" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_add_task"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentBottom="true"
+        android:layout_margin="16dp"
+        app:backgroundTint="@color/pomodoro_accent"
+        app:tint="@color/white"
+        android:src="@android:drawable/ic_input_add" />
+</RelativeLayout>
+```
+
+### File: res/layout/fragment_settings.xml
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:text="Tính năng nâng cao"
+        android:textSize="22sp"
+        android:textStyle="bold" />
+
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/switch_strict_mode"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:text="Strict Mode (Kỷ luật nghiêm ngặt)"
+        android:textSize="18sp" />
+
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/switch_dev_mode"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="32dp"
+        android:text="Developer Mode (Chạy bằng giây)"
+        android:textSize="18sp" />
+
+    <Button
+        android:id="@+id/btn_help"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:backgroundTint="@color/pomodoro_primary"
+        android:paddingVertical="12dp"
+        android:textSize="18sp"
+        android:text="Hướng dẫn sử dụng" />
+</LinearLayout>
+```
+
+### File: res/layout/fragment_statistics.xml
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#E0E0E0"
+        android:padding="16dp"
+        android:text="Hoạt động 30 ngày gần nhất"
+        android:textSize="24sp"
+        android:textStyle="bold" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recycler_statistics"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:padding="8dp" />
+</LinearLayout>
+```
+
+### File: res/layout/item_daily_stat.xml
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="16dp"
+    android:layout_marginBottom="8dp"
+    android:background="#F5F5F5">
+
+    <TextView
+        android:id="@+id/text_stat_date"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:textColor="#333333"/>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="end">
+        <TextView
+            android:id="@+id/text_stat_pomodoros"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="21sp"
+            android:textColor="#D32F2F"
+            android:textStyle="bold"/>
+        <TextView
+            android:id="@+id/text_stat_minutes"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="18sp"
+            android:textColor="#666666"/>
+    </LinearLayout>
+</LinearLayout>
+```
+
+### File: res/layout/item_task.xml
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginTop="8dp"
+    android:layout_marginBottom="8dp"
+    app:cardBackgroundColor="@android:color/white"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="4dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="20dp"
+        android:gravity="center_vertical">
+
+        <CheckBox
+            android:id="@+id/checkbox_task"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:clickable="false"
+            android:focusable="false"
+            android:buttonTint="#FF3D00"/>
+
+        <TextView
+            android:id="@+id/text_task_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:paddingStart="12dp"
+            android:textColor="#212121"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_pomodoro_badge"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="6dp">
+
+            <TextView
+                android:id="@+id/text_pomodoro_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#D32F2F"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+</androidx.cardview.widget.CardView>
+```
+
+### File: res/layout/item_task_detail.xml
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="12dp"
+    app:cardBackgroundColor="#F8F9FA"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="0dp"
+    app:strokeColor="#E0E0E0"
+    app:strokeWidth="1dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:id="@+id/text_detail_task_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="Task Name"
+            android:textColor="#212121"
+            android:textSize="21sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/text_detail_pomodoros"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="🍅 2 phiên"
+                android:textColor="#E53935"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/text_detail_minutes"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⏱ 50 phút"
+                android:textColor="#1976D2"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+</androidx.cardview.widget.CardView>
+```
+
+### File: res/menu/bottom_nav_menu.xml
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_home"
+        android:title="Công việc"
+        android:icon="@android:drawable/ic_menu_agenda" />
+    <item
+        android:id="@+id/nav_statistics"
+        android:title="Thống kê"
+        android:icon="@android:drawable/ic_menu_recent_history" />
+    <item
+        android:id="@+id/nav_favorites"
+        android:title="Quote yêu thích"
+        android:icon="@android:drawable/ic_menu_gallery" />
+    <item
+        android:id="@+id/nav_settings"
+        android:title="Cài đặt"
+        android:icon="@android:drawable/ic_menu_preferences" />
+</menu>
+```
+
+### File: res/menu/drawer_menu.xml
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_home"
+        android:title="Trang chủ" />
+    <item
+        android:id="@+id/nav_statistics"
+        android:title="Thống kê theo ngày" />
+</menu>
+```
+
+### File: res/mipmap-anydpi-v26/ic_launcher.xml
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>
+```
+
+### File: res/mipmap-anydpi-v26/ic_launcher_round.xml
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>
+```
+
+### File: res/mipmap-hdpi/ic_launcher.webp
+> [BINARY FILE SKIPPED]
+
+### File: res/mipmap-hdpi/ic_launcher_round.webp
+> [BINARY FILE SKIPPED]
+
+### File: res/mipmap-mdpi/ic_launcher.webp
+> [BINARY FILE SKIPPED]
+
+### File: res/mipmap-mdpi/ic_launcher_round.webp
+> [BINARY FILE SKIPPED]
+
+### File: res/mipmap-xhdpi/ic_launcher.webp
+> [BINARY FILE SKIPPED]
+
+### File: res/mipmap-xhdpi/ic_launcher_round.webp
+> [BINARY FILE SKIPPED]
+
+### File: res/mipmap-xxhdpi/ic_launcher.webp
+> [BINARY FILE SKIPPED]
+
+### File: res/mipmap-xxhdpi/ic_launcher_round.webp
+> [BINARY FILE SKIPPED]
+
+### File: res/mipmap-xxxhdpi/ic_launcher.webp
+> [BINARY FILE SKIPPED]
+
+### File: res/mipmap-xxxhdpi/ic_launcher_round.webp
+> [BINARY FILE SKIPPED]
+
+### File: res/raw/relax_anim.json
+```json
+{"v":"5.6.5","fr":25,"ip":0,"op":125,"w":500,"h":500,"nm":"Comp 1","ddd":0,"assets":[{"id":"comp_0","layers":[{"ddd":0,"ind":1,"ty":4,"nm":"Capa de formas 4","sr":1,"ks":{"o":{"a":0,"k":100,"ix":11},"r":{"a":0,"k":0,"ix":10},"p":{"a":0,"k":[366,264.5,0],"ix":2},"a":{"a":0,"k":[84,-1.5,0],"ix":1},"s":{"a":0,"k":[-92.149,100,100],"ix":6}},"ao":0,"shapes":[{"ty":"gr","it":[{"ind":0,"ty":"sh","ix":1,"ks":{"a":0,"k":{"i":[[0,0],[-2.636,13.405],[1,13.5],[-7,32.5]],"o":[[0,0],[1.856,-9.435],[-1.108,-14.959],[7.791,-36.17]],"v":[[96.5,28],[71.136,14.595],[96.5,-4.5],[71.5,-33.5]],"c":false},"ix":2},"nm":"Trazado 1","mn":"ADBE Vector Shape - Group","hd":false},{"ty":"st","c":{"a":0,"k":[0,0,0,1],"ix":3},"o":{"a":0,"k":100,"ix":4},"w":{"a":0,"k":11,"ix":5},"lc":2,"lj":1,"ml":4,"bm":0,"nm":"Trazo 1","mn":"ADBE Vector Graphic - Stroke","hd":false},{"ty":"tr","p":{"a":0,"k":[0,0],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":0,"k":0,"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transformar"}],"nm":"Forma 1","np":3,"cix":2,"bm":0,"ix":1,"mn":"ADBE Vector Group","hd":false},{"ty":"tm","s":{"a":1,"k":[{"i":{"x":[0.833],"y":[1]},"o":{"x":[0.333],"y":[0.127]},"t":30,"s":[0]},{"t":91,"s":[100]}],"ix":1},"e":{"a":1,"k":[{"i":{"x":[0.667],"y":[1]},"o":{"x":[0.167],"y":[0]},"t":10,"s":[0]},{"t":64,"s":[100]}],"ix":2},"o":{"a":0,"k":0,"ix":3},"m":1,"ix":2,"nm":"Recortar trazados 1","mn":"ADBE Vector Filter - Trim","hd":false}],"ip":0,"op":126,"st":0,"bm":0},{"ddd":0,"ind":2,"ty":4,"nm":"Capa de formas 3","sr":1,"ks":{"o":{"a":0,"k":100,"ix":11},"r":{"a":0,"k":0,"ix":10},"p":{"a":0,"k":[283,259.5,0],"ix":2},"a":{"a":0,"k":[84,-1.5,0],"ix":1},"s":{"a":0,"k":[-92.149,100,100],"ix":6}},"ao":0,"shapes":[{"ty":"gr","it":[{"ind":0,"ty":"sh","ix":1,"ks":{"a":0,"k":{"i":[[0,0],[-2.6,17.905],[1,13.5],[-7,32.5]],"o":[[0,0],[1.382,-9.516],[-1.108,-14.959],[7.791,-36.17]],"v":[[87.276,36.25],[71.407,19.345],[90.26,-4.5],[71.5,-33.5]],"c":false},"ix":2},"nm":"Trazado 1","mn":"ADBE Vector Shape - Group","hd":false},{"ty":"st","c":{"a":0,"k":[0,0,0,1],"ix":3},"o":{"a":0,"k":100,"ix":4},"w":{"a":0,"k":11,"ix":5},"lc":2,"lj":1,"ml":4,"bm":0,"nm":"Trazo 1","mn":"ADBE Vector Graphic - Stroke","hd":false},{"ty":"tr","p":{"a":0,"k":[0,0],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":0,"k":0,"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transformar"}],"nm":"Forma 1","np":3,"cix":2,"bm":0,"ix":1,"mn":"ADBE Vector Group","hd":false},{"ty":"tm","s":{"a":1,"k":[{"i":{"x":[0.833],"y":[1]},"o":{"x":[0.333],"y":[0.158]},"t":45,"s":[0]},{"t":121,"s":[100]}],"ix":1},"e":{"a":1,"k":[{"i":{"x":[0.667],"y":[1]},"o":{"x":[0.167],"y":[0]},"t":25,"s":[0]},{"t":94,"s":[100]}],"ix":2},"o":{"a":0,"k":0,"ix":3},"m":1,"ix":2,"nm":"Recortar trazados 1","mn":"ADBE Vector Filter - Trim","hd":false}],"ip":0,"op":126,"st":0,"bm":0},{"ddd":0,"ind":3,"ty":4,"nm":"Capa de formas 2","sr":1,"ks":{"o":{"a":0,"k":100,"ix":11},"r":{"a":0,"k":0,"ix":10},"p":{"a":0,"k":[284,176.5,0],"ix":2},"a":{"a":0,"k":[40,-12.5,0],"ix":1},"s":{"a":0,"k":[100,129.63,100],"ix":6}},"ao":0,"shapes":[{"ty":"gr","it":[{"ind":0,"ty":"sh","ix":1,"ks":{"a":0,"k":{"i":[[0,0],[-2.636,13.405],[1,13.5],[-7,32.5]],"o":[[0,0],[1.856,-9.435],[-1.108,-14.959],[7.791,-36.17]],"v":[[96.5,28],[71.136,14.595],[96.5,-4.5],[71.5,-33.5]],"c":false},"ix":2},"nm":"Trazado 1","mn":"ADBE Vector Shape - Group","hd":false},{"ty":"st","c":{"a":0,"k":[0,0,0,1],"ix":3},"o":{"a":0,"k":100,"ix":4},"w":{"a":0,"k":11,"ix":5},"lc":2,"lj":1,"ml":4,"bm":0,"nm":"Trazo 1","mn":"ADBE Vector Graphic - Stroke","hd":false},{"ty":"tr","p":{"a":0,"k":[0,0],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":0,"k":0,"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transformar"}],"nm":"Forma 1","np":3,"cix":2,"bm":0,"ix":1,"mn":"ADBE Vector Group","hd":false},{"ty":"tm","s":{"a":1,"k":[{"i":{"x":[0.667],"y":[1]},"o":{"x":[0.167],"y":[0]},"t":55,"s":[0]},{"t":115,"s":[100]}],"ix":1},"e":{"a":1,"k":[{"i":{"x":[0.667],"y":[1]},"o":{"x":[0.333],"y":[0]},"t":55,"s":[0]},{"t":124,"s":[100]}],"ix":2},"o":{"a":0,"k":0,"ix":3},"m":1,"ix":2,"nm":"Recortar trazados 1","mn":"ADBE Vector Filter - Trim","hd":false}],"ip":0,"op":126,"st":0,"bm":0}]},{"id":"comp_1","layers":[{"ddd":0,"ind":1,"ty":4,"nm":"Capa de formas 1","parent":2,"sr":1,"ks":{"o":{"a":0,"k":100,"ix":11},"r":{"a":0,"k":0,"ix":10},"p":{"a":0,"k":[165.6,222.4,0],"ix":2},"a":{"a":0,"k":[168,232.147,0],"ix":1},"s":{"a":0,"k":[112.235,112.235,100],"ix":6}},"ao":0,"shapes":[{"ty":"gr","it":[{"ind":0,"ty":"sh","ix":1,"ks":{"a":0,"k":{"i":[[0,0],[0,0],[0,0],[0,0],[0,0]],"o":[[0,0],[0,0],[0,0],[0,0],[0,0]],"v":[[-48.938,76.063],[-48.938,-31.32],[1.398,-76.063],[48.938,-28.524],[48.938,76.063]],"c":true},"ix":2},"nm":"Trazado 1","mn":"ADBE Vector Shape - Group","hd":false},{"ty":"fl","c":{"a":0,"k":[0.980000035903,0.804000016755,0.383999992819,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Relleno 1","mn":"ADBE Vector Graphic - Fill","hd":false},{"ty":"tr","p":{"a":0,"k":[165.269,302.414],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":0,"k":0,"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transformar"}],"nm":"Grupo 1","np":2,"cix":2,"bm":0,"ix":1,"mn":"ADBE Vector Group","hd":false}],"ip":0,"op":126,"st":0,"bm":0},{"ddd":0,"ind":2,"ty":4,"nm":"ticket contornos","sr":1,"ks":{"o":{"a":0,"k":100,"ix":11},"r":{"a":1,"k":[{"i":{"x":[0.667],"y":[1]},"o":{"x":[0.333],"y":[0]},"t":0,"s":[16]},{"i":{"x":[0.667],"y":[1]},"o":{"x":[0.333],"y":[0]},"t":31,"s":[-17]},{"i":{"x":[0.667],"y":[1]},"o":{"x":[0.167],"y":[0]},"t":61,"s":[16]},{"i":{"x":[0.667],"y":[1]},"o":{"x":[0.333],"y":[0]},"t":89,"s":[-17]},{"t":117,"s":[16]}],"ix":10},"p":{"a":0,"k":[280,309.5,0],"ix":2},"a":{"a":0,"k":[165.6,94.4,0],"ix":1},"s":{"a":0,"k":[31.25,31.25,100],"ix":6}},"ao":0,"shapes":[{"ty":"gr","it":[{"ind":0,"ty":"sh","ix":1,"ks":{"a":0,"k":{"i":[[0,0],[0,0]],"o":[[0,0],[0,0]],"v":[[165.269,91.165],[165.269,233.225]],"c":false},"ix":2},"nm":"Trazado 1","mn":"ADBE Vector Shape - Group","hd":false},{"ty":"st","c":{"a":0,"k":[0,0,0,1],"ix":3},"o":{"a":0,"k":100,"ix":4},"w":{"a":0,"k":32,"ix":5},"lc":1,"lj":1,"ml":10,"bm":0,"nm":"Trazo 1","mn":"ADBE Vector Graphic - Stroke","hd":false},{"ty":"tr","p":{"a":0,"k":[0,0],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":0,"k":0,"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transformar"}],"nm":"Grupo 2","np":2,"cix":2,"bm":0,"ix":1,"mn":"ADBE Vector Group","hd":false}],"ip":0,"op":126,"st":0,"bm":0},{"ddd":0,"ind":3,"ty":4,"nm":"food contornos","sr":1,"ks":{"o":{"a":0,"k":100,"ix":11},"r":{"a":0,"k":0,"ix":10},"p":{"a":0,"k":[329,332,0],"ix":2},"a":{"a":0,"k":[256,256,0],"ix":1},"s":{"a":0,"k":[51.56,51.56,100],"ix":6}},"ao":0,"shapes":[{"ty":"gr","it":[{"ind":0,"ty":"sh","ix":1,"ks":{"a":0,"k":{"i":[[13.675,8.832],[5.141,-2.325],[-2.453,-5.376],[-5.396,2.453],[-16.128,-10.389],[0,-13.909],[33.258,-6.357],[0,0],[-1.131,-5.782],[-4.992,0],[-0.704,0.149],[0,0],[0,69.035]],"o":[[-28.736,-18.475],[-5.356,2.453],[2.453,5.376],[10.284,-4.672],[7.274,4.672],[0,42.709],[0,0],[-5.781,1.131],[1.003,5.077],[0.682,0],[0,0],[5.589,-1.066],[0.001,-21.461]],"v":[[58.284,-62.325],[-21.503,-58.421],[-26.794,-44.277],[-12.651,-38.986],[46.742,-44.341],[57.579,-16.693],[-61.824,58.187],[-69.376,59.68],[-77.781,72.203],[-67.328,80.8],[-65.259,80.587],[-57.772,79.115],[78.912,-16.693]],"c":true},"ix":2},"nm":"Trazado 1","mn":"ADBE Vector Shape - Group","hd":false},{"ty":"fl","c":{"a":0,"k":[0,0,0,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Relleno 1","mn":"ADBE Vector Graphic - Fill","hd":false},{"ty":"tr","p":{"a":0,"k":[433.076,315.347],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":0,"k":0,"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transformar"}],"nm":"Grupo 1","np":4,"cix":2,"bm":0,"ix":1,"mn":"ADBE Vector Group","hd":false},{"ty":"gr","it":[{"ind":0,"ty":"sh","ix":1,"ks":{"a":0,"k":{"i":[[0,0],[14.229,0],[0,0],[10.069,10.069],[0,0],[0,0]],"o":[[-10.069,10.069],[0,0],[-14.229,0],[0,0],[0,0],[0,0]],"v":[[202.779,-4.939],[165.061,10.677],[-165.926,10.677],[-203.642,-4.939],[-209.359,-10.656],[208.495,-10.656]],"c":true},"ix":2},"nm":"Trazado 1","mn":"ADBE Vector Shape - Group","hd":false},{"ind":1,"ty":"sh","ix":2,"ks":{"a":0,"k":{"i":[[1.664,3.989],[4.309,0],[0,0],[1.664,-3.989],[-3.051,-3.05],[0,0],[-19.947,0],[0,0],[-14.144,14.102],[0,0]],"o":[[-1.664,-3.989],[0,0],[-4.309,0],[-1.664,3.989],[0,0],[14.123,14.101],[0,0],[19.947,0],[0,0],[3.049,-3.05]],"v":[[244.1,-25.419],[234.244,-32.011],[-235.089,-32.011],[-244.944,-25.419],[-242.641,-13.793],[-218.725,10.144],[-165.926,32.011],[165.039,32.011],[217.882,10.144],[241.798,-13.793]],"c":true},"ix":2},"nm":"Trazado 2","mn":"ADBE Vector Shape - Group","hd":false},{"ty":"mm","mm":1,"nm":"Combinar trazados 1","mn":"ADBE Vector Filter - Merge","hd":false},{"ty":"fl","c":{"a":0,"k":[0,0,0,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Relleno 1","mn":"ADBE Vector Graphic - Fill","hd":false},{"ty":"tr","p":{"a":0,"k":[245.764,447.977],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":0,"k":0,"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transformar"}],"nm":"Grupo 2","np":6,"cix":2,"bm":0,"ix":2,"mn":"ADBE Vector Group","hd":false},{"ty":"gr","it":[{"ind":0,"ty":"sh","ix":1,"ks":{"a":0,"k":{"i":[[17.642,0],[0,0],[0,-17.643],[0,0],[-67.669,-35.009],[-2.71,5.248],[5.248,2.71],[0,68.118],[0,0],[-5.888,0],[0,0],[0,-5.888],[0,0],[60.565,-31.296],[-2.689,-5.227],[-3.861,0],[-1.557,0.811],[0,76.139],[0,0]],"o":[[0,0],[-17.643,0],[0,0],[0,76.117],[5.227,2.687],[2.688,-5.227],[-60.544,-31.317],[0,0],[0,-5.888],[0,0],[5.888,0],[0,0],[0,68.117],[-5.248,2.709],[1.898,3.669],[1.664,0],[67.691,-34.987],[0,0],[0,-17.641]],"v":[[149.333,-118.091],[-149.333,-118.091],[-181.333,-86.091],[-181.333,-64.758],[-71.617,115.404],[-57.238,110.815],[-61.825,96.436],[-160.001,-64.759],[-160.001,-86.091],[-149.333,-96.759],[149.333,-96.759],[160,-86.091],[160,-64.759],[61.803,96.414],[57.216,110.793],[66.709,116.576],[71.594,115.379],[181.333,-64.759],[181.333,-86.092]],"c":true},"ix":2},"nm":"Trazado 1","mn":"ADBE Vector Shape - Group","hd":false},{"ty":"fl","c":{"a":0,"k":[0,0,0,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Relleno 1","mn":"ADBE Vector Graphic - Fill","hd":false},{"ty":"tr","p":{"a":0,"k":[245.322,320.744],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":0,"k":0,"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transformar"}],"nm":"Grupo 3","np":2,"cix":2,"bm":0,"ix":3,"mn":"ADBE Vector Group","hd":false}],"ip":0,"op":126,"st":0,"bm":0},{"ddd":0,"ind":4,"ty":4,"nm":"Capa de formas 5","sr":1,"ks":{"o":{"a":0,"k":100,"ix":11},"r":{"a":0,"k":0,"ix":10},"p":{"a":0,"k":[250,250,0],"ix":2},"a":{"a":0,"k":[0,0,0],"ix":1},"s":{"a":0,"k":[100,100,100],"ix":6}},"ao":0,"shapes":[{"ty":"gr","it":[{"ind":0,"ty":"sh","ix":1,"ks":{"a":0,"k":{"i":[[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0]],"o":[[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0]],"v":[[-2,60],[-14,71.5],[-15,100],[-6,122.5],[59,132],[85,99.5],[90.5,60.5]],"c":true},"ix":2},"nm":"Trazado 1","mn":"ADBE Vector Shape - Group","hd":false},{"ty":"fl","c":{"a":0,"k":[1,1,1,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Relleno 1","mn":"ADBE Vector Graphic - Fill","hd":false},{"ty":"tr","p":{"a":0,"k":[0,0],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":0,"k":0,"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transformar"}],"nm":"Forma 1","np":3,"cix":2,"bm":0,"ix":1,"mn":"ADBE Vector Group","hd":false}],"ip":0,"op":750,"st":0,"bm":0}]}],"layers":[{"ddd":0,"ind":1,"ty":0,"nm":"smoke","refId":"comp_0","sr":1,"ks":{"o":{"a":0,"k":100,"ix":11},"r":{"a":0,"k":0,"ix":10},"p":{"a":0,"k":[240,260,0],"ix":2},"a":{"a":0,"k":[250,250,0],"ix":1},"s":{"a":0,"k":[118.4,118.4,100],"ix":6}},"ao":0,"w":500,"h":500,"ip":0,"op":127,"st":0,"bm":0},{"ddd":0,"ind":2,"ty":0,"nm":"cup","refId":"comp_1","sr":1,"ks":{"o":{"a":0,"k":100,"ix":11},"r":{"a":0,"k":0,"ix":10},"p":{"a":0,"k":[240,260,0],"ix":2},"a":{"a":0,"k":[250,250,0],"ix":1},"s":{"a":0,"k":[118.4,118.4,100],"ix":6}},"ao":0,"w":500,"h":500,"ip":0,"op":127,"st":0,"bm":0},{"ddd":0,"ind":4,"ty":4,"nm":"Capa de formas 1","sr":1,"ks":{"o":{"a":0,"k":100,"ix":11},"r":{"a":1,"k":[{"i":{"x":[0.833],"y":[0.833]},"o":{"x":[0.167],"y":[0.167]},"t":0,"s":[0]},{"t":126,"s":[2160]}],"ix":10},"p":{"a":0,"k":[185.125,223.75,0],"ix":2},"a":{"a":0,"k":[256.125,254.75,0],"ix":1},"s":{"a":0,"k":[75.375,85.251,100],"ix":6}},"ao":0,"shapes":[{"ty":"gr","it":[{"ind":0,"ty":"sh","ix":1,"ks":{"a":0,"k":{"i":[[3.74,0],[0,0],[0,3.74],[0,0],[-3.74,0],[0,0],[0,-3.739],[0,0]],"o":[[0,0],[-3.74,0],[0,0],[0,-3.739],[0,0],[3.74,0],[0,0],[0,3.74]],"v":[[0.211,53.769],[-0.21,53.769],[-6.981,46.998],[-6.981,-46.998],[-0.21,-53.769],[0.211,-53.769],[6.982,-46.998],[6.982,46.998]],"c":true},"ix":2},"nm":"Trazado 1","mn":"ADBE Vector Shape - Group","hd":false},{"ty":"fl","c":{"a":0,"k":[0,0,0,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Relleno 1","mn":"ADBE Vector Graphic - Fill","hd":false},{"ty":"tr","p":{"a":0,"k":[256,206.818],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":0,"k":0,"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transformar"}],"nm":"Grupo 2","np":2,"cix":2,"bm":0,"ix":1,"mn":"ADBE Vector Group","hd":false}],"ip":0,"op":750,"st":0,"bm":0},{"ddd":0,"ind":5,"ty":4,"nm":"Capa de formas 2","sr":1,"ks":{"o":{"a":0,"k":100,"ix":11},"r":{"a":1,"k":[{"i":{"x":[0.833],"y":[0.833]},"o":{"x":[0.167],"y":[0.167]},"t":0,"s":[0]},{"t":124,"s":[360]}],"ix":10},"p":{"a":0,"k":[185.25,223.25,0],"ix":2},"a":{"a":0,"k":[258,257.25,0],"ix":1},"s":{"a":0,"k":[100,75.626,100],"ix":6}},"ao":0,"shapes":[{"ty":"gr","it":[{"ind":0,"ty":"sh","ix":1,"ks":{"a":0,"k":{"i":[[0,-3.602],[0,0],[3.602,0],[0,0],[0,3.601],[0,0],[-3.602,0],[0,0]],"o":[[0,0],[0,3.601],[0,0],[-3.602,0],[0,0],[0,-3.602],[0,0],[3.602,0]],"v":[[39.884,-0.81],[39.884,0.811],[33.362,7.332],[-33.363,7.332],[-39.885,0.811],[-39.885,-0.81],[-33.363,-7.331],[33.362,-7.331]],"c":true},"ix":2},"nm":"Trazado 1","mn":"ADBE Vector Shape - Group","hd":false},{"ty":"fl","c":{"a":0,"k":[0,0,0,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Relleno 1","mn":"ADBE Vector Graphic - Fill","hd":false},{"ty":"tr","p":{"a":0,"k":[222.999,257.402],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":0,"k":0,"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transformar"}],"nm":"Grupo 1","np":2,"cix":2,"bm":0,"ix":1,"mn":"ADBE Vector Group","hd":false}],"ip":0,"op":750,"st":0,"bm":0},{"ddd":0,"ind":6,"ty":4,"nm":"clock contornos","sr":1,"ks":{"o":{"a":0,"k":100,"ix":11},"r":{"a":0,"k":0,"ix":10},"p":{"a":0,"k":[185,224,0],"ix":2},"a":{"a":0,"k":[256,256,0],"ix":1},"s":{"a":0,"k":[69.922,69.922,100],"ix":6}},"ao":0,"shapes":[{"ty":"gr","it":[{"ind":0,"ty":"sh","ix":1,"ks":{"a":0,"k":{"i":[[-11.389,0],[0,-11.389],[11.39,0],[0,11.39]],"o":[[11.39,0],[0,11.39],[-11.389,0],[0,-11.389]],"v":[[0,-20.622],[20.622,0],[0,20.622],[-20.622,0]],"c":true},"ix":2},"nm":"Trazado 1","mn":"ADBE Vector Shape - Group","hd":false},{"ty":"fl","c":{"a":0,"k":[0,0,0,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Relleno 1","mn":"ADBE Vector Graphic - Fill","hd":false},{"ty":"tr","p":{"a":0,"k":[256,256],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":0,"k":0,"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transformar"}],"nm":"Grupo 3","np":2,"cix":2,"bm":0,"ix":1,"mn":"ADBE Vector Group","hd":false},{"ty":"gr","it":[{"ind":0,"ty":"sh","ix":1,"ks":{"a":0,"k":{"i":[[1.977,0],[1.509,1.509],[0,0],[-3.017,3.018],[-3.018,-3.017],[0,0],[3.017,-3.018]],"o":[[-1.977,0],[0,0],[-3.017,-3.018],[3.018,-3.017],[0,0],[3.017,3.017],[-1.51,1.508]],"v":[[4.01,12.113],[-1.454,9.85],[-9.473,1.832],[-9.473,-9.095],[1.453,-9.096],[9.473,-1.077],[9.473,9.85]],"c":true},"ix":2},"nm":"Trazado 1","mn":"ADBE Vector Shape - Group","hd":false},{"ty":"fl","c":{"a":0,"k":[0.98431378603,0.807843208313,0.388235330582,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Relleno 1","mn":"ADBE Vector Graphic - Fill","hd":false},{"ty":"tr","p":{"a":0,"k":[149.057,148.086],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":0,"k":0,"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transformar"}],"nm":"Grupo 4","np":2,"cix":2,"bm":0,"ix":2,"mn":"ADBE Vector Group","hd":false},{"ty":"gr","it":[{"ind":0,"ty":"sh","ix":1,"ks":{"a":0,"k":{"i":[[4.267,0],[0,0],[0,4.267],[-4.267,0],[0,0],[0,-4.267]],"o":[[0,0],[-4.267,0],[0,-4.267],[0,0],[4.267,0],[0.001,4.267]],"v":[[5.67,7.726],[-5.671,7.726],[-13.396,0],[-5.671,-7.726],[5.67,-7.726],[13.396,0]],"c":true},"ix":2},"nm":"Trazado 1","mn":"ADBE Vector Shape - Group","hd":false},{"ty":"fl","c":{"a":0,"k":[0.980392217636,0.803921639919,0.384313762188,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Relleno 1","mn":"ADBE Vector Graphic - Fill","hd":false},{"ty":"tr","p":{"a":0,"k":[104.514,255.16],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":0,"k":0,"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transformar"}],"nm":"Grupo 5","np":2,"cix":2,"bm":0,"ix":3,"mn":"ADBE Vector Group","hd":false},{"ty":"gr","it":[{"ind":0,"ty":"sh","ix":1,"ks":{"a":0,"k":{"i":[[1.977,0],[1.508,1.509],[-3.017,3.017],[0,0],[-3.018,-3.018],[3.018,-3.018],[0,0]],"o":[[-1.977,0],[-3.018,-3.017],[0,0],[3.018,-3.016],[3.017,3.018],[0,0],[-1.508,1.509]],"v":[[-4.01,12.113],[-9.473,9.849],[-9.473,-1.077],[-1.454,-9.096],[9.473,-9.095],[9.472,1.832],[1.453,9.85]],"c":true},"ix":2},"nm":"Trazado 1","mn":"ADBE Vector Shape - Group","hd":false},{"ty":"fl","c":{"a":0,"k":[0.984313726425,0.807843148708,0.388235300779,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Relleno 1","mn":"ADBE Vector Graphic - Fill","hd":false},{"ty":"tr","p":{"a":0,"k":[148.462,361.724],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":0,"k":0,"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transformar"}],"nm":"Grupo 6","np":2,"cix":2,"bm":0,"ix":4,"mn":"ADBE Vector Group","hd":false},{"ty":"gr","it":[{"ind":0,"ty":"sh","ix":1,"ks":{"a":0,"k":{"i":[[4.267,0],[0,4.267],[0,0],[-4.267,0],[0,-4.267],[0,0]],"o":[[-4.267,0],[0,0],[0,-4.268],[4.267,0],[0,0],[0,4.267]],"v":[[0,13.396],[-7.726,5.67],[-7.726,-5.67],[0,-13.396],[7.726,-5.67],[7.726,5.67]],"c":true},"ix":2},"nm":"Trazado 1","mn":"ADBE Vector Shape - Group","hd":false},{"ty":"fl","c":{"a":0,"k":[0.984313726425,0.807843148708,0.388235300779,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Relleno 1","mn":"ADBE Vector Graphic - Fill","hd":false},{"ty":"tr","p":{"a":0,"k":[255.158,406.647],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":0,"k":0,"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transformar"}],"nm":"Grupo 7","np":2,"cix":2,"bm":0,"ix":5,"mn":"ADBE Vector Group","hd":false},{"ty":"gr","it":[{"ind":0,"ty":"sh","ix":1,"ks":{"a":0,"k":{"i":[[1.977,0],[1.509,1.508],[0,0],[-3.017,3.02],[-3.018,-3.016],[0,0],[3.016,-3.018]],"o":[[-1.978,0],[0,0],[-3.017,-3.019],[3.018,-3.016],[0,0],[3.016,3.017],[-1.509,1.508]],"v":[[4.01,12.112],[-1.454,9.849],[-9.473,1.832],[-9.473,-9.097],[1.454,-9.097],[9.474,-1.078],[9.474,9.849]],"c":true},"ix":2},"nm":"Trazado 1","mn":"ADBE Vector Shape - Group","hd":false},{"ty":"fl","c":{"a":0,"k":[0.984313726425,0.807843148708,0.388235300779,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Relleno 1","mn":"ADBE Vector Graphic - Fill","hd":false},{"ty":"tr","p":{"a":0,"k":[362.101,362.32],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":0,"k":0,"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transformar"}],"nm":"Grupo 8","np":2,"cix":2,"bm":0,"ix":6,"mn":"ADBE Vector Group","hd":false},{"ty":"gr","it":[{"ind":0,"ty":"sh","ix":1,"ks":{"a":0,"k":{"i":[[4.267,0],[0,0],[0,4.267],[-4.266,0],[0,0],[0,-4.267]],"o":[[0,0],[-4.267,0],[0,-4.267],[0,0],[4.268,0],[0,4.267]],"v":[[5.67,7.726],[-5.671,7.726],[-13.396,0],[-5.671,-7.726],[5.67,-7.726],[13.396,0]],"c":true},"ix":2},"nm":"Trazado 1","mn":"ADBE Vector Shape - Group","hd":false},{"ty":"fl","c":{"a":0,"k":[0.984313726425,0.807843148708,0.388235300779,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Relleno 1","mn":"ADBE Vector Graphic - Fill","hd":false},{"ty":"tr","p":{"a":0,"k":[406.645,256.001],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":0,"k":0,"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transformar"}],"nm":"Grupo 9","np":2,"cix":2,"bm":0,"ix":7,"mn":"ADBE Vector Group","hd":false},{"ty":"gr","it":[{"ind":0,"ty":"sh","ix":1,"ks":{"a":0,"k":{"i":[[1.977,0],[1.51,1.508],[-3.017,3.018],[0,0],[-3.017,-3.017],[3.019,-3.018],[0,0]],"o":[[-1.979,0],[-3.016,-3.018],[0,0],[3.016,-3.018],[3.018,3.018],[0,0],[-1.51,1.507]],"v":[[-4.009,12.113],[-9.475,9.85],[-9.474,-1.077],[-1.453,-9.095],[9.473,-9.095],[9.471,1.832],[1.453,9.851]],"c":true},"ix":2},"nm":"Trazado 1","mn":"ADBE Vector Shape - Group","hd":false},{"ty":"fl","c":{"a":0,"k":[0.984313726425,0.807843148708,0.388235300779,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Relleno 1","mn":"ADBE Vector Graphic - Fill","hd":false},{"ty":"tr","p":{"a":0,"k":[362.697,148.681],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":0,"k":0,"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transformar"}],"nm":"Grupo 10","np":2,"cix":2,"bm":0,"ix":8,"mn":"ADBE Vector Group","hd":false},{"ty":"gr","it":[{"ind":0,"ty":"sh","ix":1,"ks":{"a":0,"k":{"i":[[4.267,0],[0,4.267],[0,0],[-4.267,0],[0,-4.267],[0,0]],"o":[[-4.267,0],[0,0],[0,-4.267],[4.267,0],[0,0],[0,4.267]],"v":[[0,13.396],[-7.727,5.67],[-7.727,-5.67],[0,-13.396],[7.727,-5.67],[7.727,5.67]],"c":true},"ix":2},"nm":"Trazado 1","mn":"ADBE Vector Shape - Group","hd":false},{"ty":"fl","c":{"a":0,"k":[0.984313726425,0.807843148708,0.388235300779,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Relleno 1","mn":"ADBE Vector Graphic - Fill","hd":false},{"ty":"tr","p":{"a":0,"k":[256,104.515],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":0,"k":0,"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transformar"}],"nm":"Grupo 11","np":2,"cix":2,"bm":0,"ix":9,"mn":"ADBE Vector Group","hd":false},{"ty":"gr","it":[{"ind":0,"ty":"sh","ix":1,"ks":{"a":0,"k":{"i":[[-110.174,0],[0,-110.174],[110.174,0],[0,110.174]],"o":[[110.174,0],[0,110.174],[-110.174,0],[0,-110.174]],"v":[[0,-199.487],[199.487,0],[0,199.487],[-199.487,0]],"c":true},"ix":2},"nm":"Trazado 1","mn":"ADBE Vector Shape - Group","hd":false},{"ty":"fl","c":{"a":0,"k":[1,1,1,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Relleno 1","mn":"ADBE Vector Graphic - Fill","hd":false},{"ty":"tr","p":{"a":0,"k":[256,256.001],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":0,"k":0,"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transformar"}],"nm":"Grupo 12","np":2,"cix":2,"bm":0,"ix":10,"mn":"ADBE Vector Group","hd":false},{"ty":"gr","it":[{"ind":0,"ty":"sh","ix":1,"ks":{"a":0,"k":{"i":[[-141.385,0],[0,-141.385],[141.385,0],[0,141.385]],"o":[[141.385,0],[0,141.385],[-141.385,0],[0,-141.385]],"v":[[0,-256],[256,0],[0,256],[-256,0]],"c":true},"ix":2},"nm":"Trazado 1","mn":"ADBE Vector Shape - Group","hd":false},{"ty":"fl","c":{"a":0,"k":[0.913725495338,0.913725495338,0.913725495338,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Relleno 1","mn":"ADBE Vector Graphic - Fill","hd":false},{"ty":"tr","p":{"a":0,"k":[256,256],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[83.603,83.603],"ix":3},"r":{"a":0,"k":0,"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transformar"}],"nm":"Grupo 13","np":2,"cix":2,"bm":0,"ix":11,"mn":"ADBE Vector Group","hd":false}],"ip":0,"op":750,"st":0,"bm":0}],"markers":[]}
+```
+
+### File: res/values/colors.xml
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <color name="pomodoro_primary">#E53935</color>
+    <color name="pomodoro_secondary">#FFCDD2</color>
+    <color name="pomodoro_accent">#FF5722</color>
+
+    <color name="task_active_bg">#FFEBEE</color>
+</resources>
+```
+
+### File: res/values/strings.xml
+```xml
+<resources>
+    <string name="app_name">Pomodoro</string>
+</resources>
+```
+
+### File: res/values/themes.xml
+```xml
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Base.Theme.Pomodoro" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/pomodoro_primary</item>
+        <item name="colorSecondary">@color/pomodoro_secondary</item>
+        <item name="colorAccent">@color/pomodoro_accent</item>
+        <item name="colorSecondaryContainer">#FFCDD2</item>
+        <item name="alertDialogTheme">@style/CustomAlertDialogTheme</item>
+        <item name="materialButtonStyle">@style/CustomButtonStyle</item>
+    </style>
+
+    <style name="Theme.Pomodoro" parent="Base.Theme.Pomodoro" />
+
+    <style name="CustomAlertDialogTheme" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="materialAlertDialogTitleTextStyle">@style/CustomAlertDialogTitleStyle</item>
+        <item name="materialAlertDialogBodyTextStyle">@style/CustomAlertDialogBodyStyle</item>
+        <item name="buttonBarButtonStyle">@style/CustomAlertButtonStyle</item>
+    </style>
+
+    <style name="CustomAlertDialogTitleStyle" parent="MaterialAlertDialog.Material3.Title.Text">
+        <item name="android:textSize">24sp</item>
+    </style>
+
+    <style name="CustomAlertDialogBodyStyle" parent="MaterialAlertDialog.Material3.Body.Text">
+        <item name="android:textSize">19sp</item>
+    </style>
+
+    <style name="CustomAlertButtonStyle" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <style name="CustomButtonStyle" parent="Widget.Material3.Button">
+        <item name="android:textSize">16sp</item>
+        <item name="android:minHeight">55dp</item>
+        <item name="android:paddingTop">12dp</item>
+        <item name="android:paddingBottom">12dp</item>
+        <item name="android:paddingStart">30dp</item>
+        <item name="android:paddingEnd">30dp</item>
+    </style>
+
+    <style name="CustomDrawerTextAppearance" parent="TextAppearance.Material3.BodyLarge">
+        <item name="android:textSize">20sp</item>
+    </style>
+</resources>
+```
+
+### File: res/values-night/themes.xml
+```xml
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Base.Theme.Pomodoro" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Customize your dark theme here. -->
+        <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
+        <item name="alertDialogTheme">@style/CustomAlertDialogTheme</item>
+        <item name="materialButtonStyle">@style/CustomButtonStyle</item>
+    </style>
+</resources>
+```
+
+### File: res/xml/backup_rules.xml
+```xml
+<?xml version="1.0" encoding="utf-8"?><!--
+   Sample backup rules file; uncomment and customize as necessary.
+   See https://developer.android.com/guide/topics/data/autobackup
+   for details.
+   Note: This file is ignored for devices older than API 31
+   See https://developer.android.com/about/versions/12/backup-restore
+-->
+<full-backup-content>
+    <!--
+   <include domain="sharedpref" path="."/>
+   <exclude domain="sharedpref" path="device.xml"/>
+-->
+</full-backup-content>
+```
+
+### File: res/xml/data_extraction_rules.xml
+```xml
+<?xml version="1.0" encoding="utf-8"?><!--
+   Sample data extraction rules file; uncomment and customize as necessary.
+   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
+   for details.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- TODO: Use <include> and <exclude> to control what is backed up.
+        <include .../>
+        <exclude .../>
+        -->
+    </cloud-backup>
+    <!--
+    <device-transfer>
+        <include .../>
+        <exclude .../>
+    </device-transfer>
+    -->
+</data-extraction-rules>
+```

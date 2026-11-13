@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="12dp"
+    android:layout_marginVertical="8dp"
+    app:cardBackgroundColor="@android:color/white"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="3dp">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="20dp">
+
+        <View
+            android:id="@+id/quote_accent_bar"
+            android:layout_width="4dp"
+            android:layout_height="wrap_content"
+            android:layout_alignTop="@id/layout_quote_content"
+            android:layout_alignBottom="@id/layout_quote_content"
+            android:background="@color/pomodoro_primary" />
+
+        <LinearLayout
+            android:id="@+id/layout_quote_content"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_toEndOf="@id/quote_accent_bar"
+            android:layout_toStartOf="@id/btn_delete_quote"
+            android:layout_marginStart="14dp"
+            android:layout_marginEnd="8dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/text_item_quote"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Nội dung trích dẫn"
+                android:textColor="#212121"
+                android:textSize="18sp"
+                android:textStyle="italic" />
+
+            <TextView
+                android:id="@+id/text_item_author"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="- Tác giả"
+                android:textColor="#D32F2F"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/btn_delete_quote"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_delete"
+            app:tint="#9E9E9E"
+            android:contentDescription="Xóa trích dẫn" />
+    </RelativeLayout>
+</androidx.cardview.widget.CardView>
