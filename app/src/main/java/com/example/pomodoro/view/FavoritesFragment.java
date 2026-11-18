@@ -43,8 +43,15 @@ public class FavoritesFragment extends Fragment {
         adapter = new FavoriteQuoteAdapter();
         recyclerView.setAdapter(adapter);
 
+        android.content.SharedPreferences userPrefs = requireActivity().getSharedPreferences("TimerPrefs", android.content.Context.MODE_PRIVATE);
+        String userId = userPrefs.getString("user_device_id", null);
+        if (userId == null) {
+            userId = java.util.UUID.randomUUID().toString();
+            userPrefs.edit().putString("user_device_id", userId).apply();
+        }
+
         String dbUrl = "https://pomodoro-3cf47-default-rtdb.asia-southeast1.firebasedatabase.app/";
-        mDatabase = FirebaseDatabase.getInstance(dbUrl).getReference("favorite_quotes");
+        mDatabase = FirebaseDatabase.getInstance(dbUrl).getReference("favorite_quotes").child(userId);
 
         adapter.setOnQuoteDeleteListener(quote -> {
             new AlertDialog.Builder(requireContext())

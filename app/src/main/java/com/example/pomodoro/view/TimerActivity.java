@@ -163,11 +163,17 @@ public class TimerActivity extends AppCompatActivity {
         btnSkip = findViewById(R.id.btn_skip);
         btnFavoriteQuote = findViewById(R.id.btn_favorite_quote);
 
+        SharedPreferences userPrefs = getSharedPreferences("TimerPrefs", Context.MODE_PRIVATE);
+        String userId = userPrefs.getString("user_device_id", null);
+        if (userId == null) {
+            userId = java.util.UUID.randomUUID().toString();
+            userPrefs.edit().putString("user_device_id", userId).apply();
+        }
+
         String dbUrl = "https://pomodoro-3cf47-default-rtdb.asia-southeast1.firebasedatabase.app/";
-        mDatabase = FirebaseDatabase.getInstance(dbUrl).getReference("favorite_quotes");
+        mDatabase = FirebaseDatabase.getInstance(dbUrl).getReference("favorite_quotes").child(userId);
         btnFavoriteQuote.setOnClickListener(v -> saveQuoteToFirebase());
         mDatabase.keepSynced(true);
-
         textStrictIndicator.setVisibility(isStrictMode ? View.VISIBLE : View.GONE);
 
         if (currentTask != null) {
